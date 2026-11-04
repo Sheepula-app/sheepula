@@ -6095,11 +6095,16 @@ function drawMenu(){
   iconButton(W-60,16,44,save.muted?'muted':'sound',toggleMute,4);
   const ML=TL('menu'),li=Math.floor(time/5)%ML.length,ph=time%5;
   if(ph>0.6&&ph<4.2&&P.expr!=='sleepy'){
-    const line=ML[li],bx=uiW.px/uiK+34,fs=fitSize(line,W-bx-36,18);ctx.font=hand(fs);const tw=ctx.measureText(line).width;
-    const by=Math.max(uiW.py/uiK-88,byC+52),bw=tw+24,bh=34;
+    const tipX=uiW.px/uiK+40,line=ML[li];let bx=tipX-6;const fs=fitSize(line,W-bx-36,18);ctx.font=hand(fs);const tw=ctx.measureText(line).width;
+    const bw=tw+24,bh=34,hit=x=>x<W/2+6+bwC+10&&x+bw>bxC-10;
+    // the bubble sits right above Sheepula's head. If that covers the Castle/Skins buttons, slide it left;
+    // only on narrow phones, where there is no room, it drops below the buttons.
+    let by=uiW.py/uiK-88;
+    if(hit(bx)){const alt=bxC-10-bw;if(alt>=8&&alt+bw>=tipX+12)bx=alt;else by=Math.max(by,byC+52);}
+    const tb=clamp(tipX+17,bx+16,bx+bw-16);
     wobRect(bx,by,bw,bh,li+1,1);inkIt('#fbf3e6',2.4);
-    ctx.beginPath();ctx.moveTo(bx+16,by+bh-1);ctx.lineTo(bx+6,by+bh+14);ctx.lineTo(bx+30,by+bh-1);ctx.closePath();inkIt('#fbf3e6',2.4);
-    ctx.fillStyle='#fbf3e6';ctx.fillRect(bx+15,by+bh-4,16,5);
+    ctx.beginPath();ctx.moveTo(tb-7,by+bh-1);ctx.lineTo(tipX,by+bh+14);ctx.lineTo(tb+7,by+bh-1);ctx.closePath();inkIt('#fbf3e6',2.4);
+    ctx.fillStyle='#fbf3e6';ctx.fillRect(tb-8,by+bh-4,16,5);
     txt(line,bx+12,by+23,{font:hand(fs),col:C.ink,stroke:null});
   }
 }
