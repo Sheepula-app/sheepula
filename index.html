@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!-- Sheepula: The Fluffy Menace. © 2026 Moonfluff Studio. All rights reserved. https://sheepula.com -->
 <title>Sheepula</title>
 <!--
@@ -1687,7 +1688,7 @@ function missionIcon(id,x,y,s){
 function progBar(x,y,w,h,f,col){wobRect(x,y,w,h,Math.floor(x+y),0.5);inkIt('rgba(10,5,20,0.55)',1.6,'rgba(245,233,218,0.5)');if(f>0){wobRect(x+2,y+2,Math.max(4,(w-4)*Math.min(1,f)),h-4,Math.floor(x),0.3);inkIt(col||C.gold,0);}}
 function drawMissionPops(m,bossUp){
   const q=run&&run.mPops&&run.mPops[0];if(!q)return false;
-  const t=q.t,a=t<0.25?t/0.25:t>2.5?Math.max(0,(2.9-t)/0.4):1,y=bossUp?m+168:m+96;
+  const t=q.t,a=t<0.25?t/0.25:t>2.5?Math.max(0,(2.9-t)/0.4):1,y=(bossUp?m+168:m+96)+(run.tip?62:0);
   const line=q.txt,fs=fitSize(line,Math.min(W-100,380),18);ctx.font=hand(fs);
   const bw=Math.max(ctx.measureText(line).width,ctx.measureText('MISSION COMPLETE!  +00').width)+66,bh=50;
   ctx.save();ctx.globalAlpha=a;ctx.translate(W/2,y-(1-a)*14);ctx.rotate(Math.sin(t*9)*0.012*(t<1?1:0));
@@ -1745,7 +1746,7 @@ function drawMarker(e,sx){
 
 /* ---- missions screen ---- */
 let msgMis='',msgMisT=0;const misFlash=[0,0,0];
-function openMissions(){state='missions';stateT=0;msgMisT=0;sfx.click();}
+function openMissions(){fadeIn=Math.max(fadeIn,0.45);state='missions';stateT=0;msgMisT=0;sfx.click();}
 function closeMissions(){state='menu';stateT=0;sfx.click();}
 function drawRankCard(x,y,w,h){
   const ri=rankIdx(),xp=rankXP(),top=ri>=RANKS.length-1;
@@ -2056,7 +2057,7 @@ function drawStoryHUD(){
     ctx.beginPath();ctx.ellipse(x,y-4,9,11,0,0,7);
     if(got){inkIt(LAMB_COLS[i],2);checkMark(x,y-4,0.85);}
     else{ctx.fillStyle='rgba(20,13,34,0.55)';ctx.fill();ctx.setLineDash([3,3]);ctx.strokeStyle='rgba(245,233,218,0.6)';ctx.lineWidth=1.6;ctx.stroke();ctx.setLineDash([]);}}
-  const f=clamp((cam+PX-run.startX)/Math.max(1,run.finishX-run.startX),0,1);
+  const f=clamp((cam+uiW.px-run.startX)/Math.max(1,run.finishX-run.startX),0,1);
   progBar(cx-44,y+19,88,9,f,C.wool);
   ctx.save();ctx.translate(cx-44+88,y+23);ctx.strokeStyle=C.wool;ctx.lineWidth=1.4;ctx.beginPath();ctx.moveTo(0,4);ctx.lineTo(0,-10);ctx.stroke();ctx.fillStyle=curLevel.boss?C.blood:'#fbf6ee';ctx.fillRect(0,-10,8,6);ctx.restore();
 }
@@ -2194,7 +2195,7 @@ function drawStoryOver(){
   const show=S.win?S.got:0;
   for(let i=0;i<3;i++){const sx=W/2+(i-1)*72,sy=py+128-(i===1?8:0),r=i===1?30:25;
     const t=stateT-0.55-i*0.38,on=i<show&&t>0,pop=on?1+0.35*Math.max(0,1-t*4):1;
-    if(on&&!run['sfx'+i]){run['sfx'+i]=1;tone(660+i*220,.16,{type:'triangle',vol:.13});tone(990+i*220,.2,{type:'triangle',vol:.08,when:.06});burst(cam+sx,sy,10,C.gold,160);}
+    if(on&&!run['sfx'+i]){run['sfx'+i]=1;tone(660+i*220,.16,{type:'triangle',vol:.13});tone(990+i*220,.2,{type:'triangle',vol:.08,when:.06});burst(cam+sx*uiK,sy*uiK,10,C.gold,160);}
     ctx.save();ctx.translate(sx,sy);ctx.scale(pop,pop);drawStar(0,0,r,on?C.gold:'rgba(20,13,34,0.9)');if(!on){ctx.strokeStyle='rgba(245,233,218,0.35)';ctx.lineWidth=1.5;ctx.stroke();}ctx.restore();}
   let line;
   if(S.win)line=S.got+'/3 lambs saved'+(S.newStars?'  ·  NEW STARS!':S.got<3?'  ·  replay for the rest!':'  ·  PERFECT!');
@@ -2219,6 +2220,132 @@ function drawStoryOver(){
   }
 }
 
+
+/* ================= First minute: get ready, guided first flight, UI scale, fades ================= */
+let uiK=1,uiW={px:0,py:0},fadeIn=1,timeScale=1;
+/* Landscape screens zoom the world in; menus and HUD are drawn in a 640-high UI space so their layouts stay the same. */
+function ui(fn){
+  const k=uiK;
+  if(k===1){fn();if(siteLink)siteLink._ui=0;return;}
+  const sW=W,sH=H,sG=G,sPX=PX,sp=pointer,b0=buttons.length;
+  W=W/k;H=H/k;G=H-66;PX=clamp(W*0.26,92,250);pointer={x:sp.x/k,y:sp.y/k};
+  ctx.save();ctx.scale(k,k);
+  try{fn();}
+  finally{
+    ctx.restore();W=sW;H=sH;G=sG;PX=sPX;pointer=sp;
+    for(let i=b0;i<buttons.length;i++){const b=buttons[i];b.x*=k;b.y*=k;b.w*=k;b.h*=k;}
+    if(siteLink&&siteLink._ui){siteLink={x:siteLink.x*k,y:siteLink.y*k,w:siteLink.w*k,h:siteLink.h*k};}
+  }
+}
+const uiToWorld=(x,y)=>[cam+x*uiK,y*uiK];
+function drawFade(){if(fadeIn>0){ctx.fillStyle=`rgba(10,5,20,${Math.min(1,fadeIn)*0.92})`;ctx.fillRect(0,0,W,H);}}
+
+/* ---- get ready: Sheepula hovers until the first tap, nobody dies before they have started ---- */
+function readyTick(dt){
+  run.readyT=(run.readyT||0)+dt;
+  P.flapK=Math.max(0,P.flapK-dt*4);
+  P.blinkT-=dt;if(P.blinkT<=0){P.blink=0.13;P.blinkT=rand(2,4.5);}if(P.blink>0)P.blink-=dt;
+  const ph=time*3.2;P.y=cliffTop()-66+Math.sin(ph)*8;P.vy=Math.cos(ph)*25;P.rot=Math.sin(ph)*0.05;
+  if((time*1.6)%1<dt*1.6)P.flapK=1;
+  P.expr='happy';P.exprT=0;
+}
+function go(){
+  if(state!=='ready')return;
+  state='playing';stateT=0;P.vy=CONFIG.flapVel;P.flapK=1;P.expr='happy';P.exprT=0.5;
+  sfx.flap();puff(cam+PX-10,P.y+22,5);
+}
+function drawTapHand(x,y,ph){
+  const press=Math.max(0,Math.sin(ph*Math.PI*2)),dy=press*7;
+  ctx.save();ctx.translate(x,y+dy);ctx.lineJoin='round';ctx.lineCap='round';
+  if(press>0.7){ctx.strokeStyle='rgba(255,210,63,0.9)';ctx.lineWidth=2.4;for(const r of [12,20]){ctx.beginPath();ctx.arc(0,-30-dy,r*(press-0.4),0,7);ctx.stroke();}}
+  wobRect(-6,-30,12,28,3,0.4);inkIt('#fbf3e6',2.4);
+  ctx.beginPath();ctx.moveTo(-17,-6);ctx.quadraticCurveTo(-19,22,0,26);ctx.quadraticCurveTo(19,22,17,-6);ctx.quadraticCurveTo(12,-12,6,-6);ctx.lineTo(-6,-6);ctx.quadraticCurveTo(-12,-12,-17,-6);ctx.closePath();inkIt('#fbf3e6',2.4);
+  ctx.strokeStyle='rgba(21,12,30,0.35)';ctx.lineWidth=1.4;for(const fx of [-10,10]){ctx.beginPath();ctx.moveTo(fx,-4);ctx.lineTo(fx,6);ctx.stroke();}
+  ctx.restore();
+}
+function drawKeycap(label,x,y,w,ph){
+  const press=Math.max(0,Math.sin(ph*Math.PI*2)),dy=press*4;
+  ctx.save();ctx.translate(x,y);
+  wobRect(-w/2,4,w,34,7,0.6);inkIt('#9a8fb0',2.2);
+  wobRect(-w/2,dy-2,w,34,8,0.6);inkIt('#fbf3e6',2.4);
+  txt(label,0,dy+21,{font:hand(fitSize(label,w-12,19)),col:C.ink,align:'center',stroke:null});
+  ctx.restore();
+}
+function drawReady(){
+  const a=Math.min(1,stateT*3);ctx.save();ctx.globalAlpha=a;
+  const title=mode==='story'&&curLevel?curLevel.name:'Get ready!';
+  const cy=H*0.29;
+  txt(title,W/2,cy,{font:disp(Math.round(clamp(fitSize(title,W-30,52),30,52))),col:C.wool,align:'center',sw:7});
+  const l1=isTouch?'Tap to flap!':'Click or press Space to flap!';
+  txt(l1,W/2,cy+40,{font:hand(fitSize(l1,W-40,27)),col:C.warn,align:'center',sw:5});
+  const l2=isTouch?'Tap again and again to stay in the air':'Keep tapping to stay in the air';
+  txt(l2,W/2,cy+68,{font:hand(fitSize(l2,W-40,18)),col:C.wool,align:'center',sw:4});
+  const px=uiW.px/uiK,py=uiW.py/uiK,ph=time*1.6;
+  if(isTouch)drawTapHand(px+82,py+34,ph);
+  else{drawKeycap('SPACE',px+110,py-8,96,ph);txt('or click',px+110,py+52,{font:hand(15),col:C.dim,align:'center',sw:3});}
+  ctx.restore();
+}
+
+/* ---- guided first flight: berries, steal a sheep, scream at the farmer, gaps ---- */
+function genTut(x0,c){
+  const my=(PT()+PB())*0.5;
+  if(c===0){addEnt({type:'tip',wx:x0+140,step:'berry'});for(let k=0;k<8;k++)addDrop(x0+340+k*44,my+20-Math.sin(k/7*Math.PI)*70);return 1000;}
+  if(c===1){addEnt({type:'tip',wx:x0+40,step:'sheep'});for(let k=0;k<4;k++)addDrop(x0+260+k*44,lerp(my,G-120,k/3));const s=addSheep(x0+520);s.tut=1;return 900;}
+  if(c===2){addEnt({type:'tip',wx:x0,step:'scream'});addEnt({type:'farmer',wx:x0+700,state:'idle',t:0,throws:1,ph:0,fast:false,aimY:0,locked:false,tut:1});return 1000;}
+  if(c===3){addEnt({type:'tip',wx:x0+40,step:'gap'});const g1=my,g2=clamp(my-50,PT()+150,PB()-150);makeStake(x0+320,g1,280,'pair');addDrop(x0+342,g1);makeStake(x0+640,g2,280,'pair');addDrop(x0+662,g2);gen.gapY=g2;return 860;}
+  addEnt({type:'tip',wx:x0+40,step:'done'});for(let k=0;k<6;k++)addDrop(x0+260+k*42,my+Math.sin(k)*30);return 760;
+}
+function setTip(step){
+  run.tip={step,t:0,done:false,fade:0};
+  if(step==='scream'){P.screamN=screamCost();}
+  if(step==='done'){save.tutDone=1;persist();sfx.best();burst(cam+PX,P.y,16,C.gold,200);}
+  else sfx.ready();
+}
+const tutFarmer=()=>ents.find(e=>e.type==='farmer'&&e.tut);
+function tutSlow(){const T=run.tip;if(!T||T.step!=='scream'||T.done||run.tutScreamed)return false;const f=tutFarmer();return !!f&&f.wx-cam<W-30&&f.wx-cam>PX+60;}
+function tutTick(dt){
+  const T=run&&run.tip;if(!T)return;T.t+=dt;
+  if(T.done){T.fade+=dt;if(T.fade>0.6)run.tip=null;return;}
+  if(T.step==='berry'){if(run.blood>=5||T.t>5.5)T.done=true;}
+  else if(T.step==='sheep'){const s=ents.find(e=>e.type==='sheep'&&e.tut);if(!s||s.state==='taken'||s.wx<cam+PX-80)T.done=true;}
+  else if(T.step==='scream'){const f=tutFarmer();if(run.tutScreamed||!f||f.state==='flee'||f.wx<cam+PX-60)T.done=true;}
+  else if(T.step==='gap'){const st=ents.filter(e=>e.type==='stake');if(!st.length||st.every(s=>s.passed)||T.t>7)T.done=true;}
+  else if(T.step==='done'&&T.t>2.8)T.done=true;
+}
+const TIP_TXT={berry:()=>'Grab the '+theme.item.many+'!',sheep:()=>'Fly LOW over the sheep to steal it!',
+  scream:()=>isTouch?'The farmer! Tap the fangs to SCREAM!':'The farmer! Press S to SCREAM!',gap:()=>'Squeeze through the gaps!',done:()=>'You got it! Now fly as far as you can!'};
+function drawTip(m){
+  const T=run&&run.tip;if(!T)return;
+  const a=T.done?Math.max(0,1-T.fade/0.6):Math.min(1,T.t*5),line=TIP_TXT[T.step]();
+  const fs=fitSize(line,Math.min(W-110,460),22);ctx.font=hand(fs);const tw=ctx.measureText(line).width,bw=tw+76,bh=54,x=W/2-bw/2,y=m+92;
+  ctx.save();ctx.globalAlpha*=a;const pop=T.t<0.25?1+0.12*Math.sin(T.t/0.25*Math.PI):1;ctx.translate(W/2,y+bh/2);ctx.scale(pop,pop);ctx.translate(-W/2,-(y+bh/2));
+  wobRect(x,y,bw,bh,17,1.2);inkIt('rgba(30,21,48,0.95)',3,C.warn);
+  ctx.beginPath();ctx.arc(x+30,y+bh/2,19,0,7);inkIt('rgba(245,233,218,0.12)',1.6,'rgba(245,233,218,0.4)');
+  const ix=x+30,iy=y+bh/2;
+  if(T.step==='berry')drawItemIcon(theme.item.kind,ix,iy,0.95);
+  else if(T.step==='sheep')drawSheepIcon(ix,iy,1);
+  else if(T.step==='scream'){ctx.beginPath();ctx.moveTo(ix-12,iy-6);ctx.quadraticCurveTo(ix,iy+16,ix+12,iy-6);ctx.quadraticCurveTo(ix,iy-1,ix-12,iy-6);ctx.closePath();inkIt('#6b1225',2);fang(ix-5,iy-4,7);fang(ix+5,iy-4,7);}
+  else if(T.step==='gap'){ctx.fillStyle=C.wood;ctx.fillRect(ix-5,iy-18,10,12);ctx.fillRect(ix-5,iy+6,10,12);ctx.strokeStyle=C.warn;ctx.lineWidth=2.4;ctx.beginPath();ctx.moveTo(ix-13,iy);ctx.lineTo(ix+11,iy);ctx.moveTo(ix+5,iy-5);ctx.lineTo(ix+11,iy);ctx.lineTo(ix+5,iy+5);ctx.stroke();}
+  else drawStar(ix,iy,13,C.gold);
+  txt(line,x+58,y+bh/2+fs*0.34,{font:hand(fs),col:C.wool,sw:4});
+  ctx.restore();
+}
+function drawTipPointers(cx,cy,r){
+  // pulsing ring + arrow at the Scream button during the scream lesson
+  const T=run&&run.tip;if(!T||T.step!=='scream'||T.done)return;
+  const p=0.5+0.5*Math.sin(time*9);ctx.save();ctx.strokeStyle=C.warn;ctx.lineWidth=4;ctx.globalAlpha=0.6+0.4*p;
+  ctx.beginPath();ctx.arc(cx,cy,r+10+p*8,0,7);ctx.stroke();
+  const ax=cx-r-34-p*8,ay=cy-r-26-p*6;ctx.lineCap='round';ctx.lineWidth=5;ctx.beginPath();ctx.moveTo(ax-26,ay-20);ctx.lineTo(ax,ay);ctx.moveTo(ax-12,ay);ctx.lineTo(ax,ay);ctx.lineTo(ax,ay-12);ctx.stroke();
+  if(!isTouch){ctx.globalAlpha=1;drawKeycap('S',ax-46,ay-56,40,time*1.6);}
+  ctx.restore();
+}
+function drawSheepArrow(e,sx){
+  const T=run&&run.tip;if(!e.tut||e.state!=='graze'||!T||T.step!=='sheep'||T.done)return;
+  const b=Math.abs(Math.sin(time*5))*10,y=G-92-b;ctx.save();ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(sx-11,y-26);ctx.lineTo(sx+11,y-26);ctx.lineTo(sx+11,y-8);ctx.lineTo(sx+20,y-8);ctx.lineTo(sx,y+12);ctx.lineTo(sx-20,y-8);ctx.lineTo(sx-11,y-8);ctx.closePath();inkIt(C.warn,2.6);
+  ctx.restore();
+}
+
 const cv=document.getElementById('game');
 const ctx=cv.getContext('2d');
 let W=360,H=640,S=1,DPR=1,G=574,PX=94;
@@ -2230,8 +2357,9 @@ function resize(){
   const cw=Math.max(1,r.width),ch=Math.max(1,r.height);
   DPR=Math.min(window.devicePixelRatio||1,2);
   cv.width=Math.round(cw*DPR);cv.height=Math.round(ch*DPR);
-  S=Math.min(ch/640,cw/360);
-  W=cw/S;H=ch/S;G=H-66;PX=clamp(W*0.26,92,250);
+  const VH=cw/ch>=1.25?540:640;
+  S=Math.min(ch/VH,cw/360);
+  W=cw/S;H=ch/S;G=H-66;PX=clamp(W*0.26,92,250);uiK=Math.min(1,H/640);
   buildStatic();
   if(state==='playing')pause();
 }
@@ -2447,6 +2575,7 @@ const worldIndexAt=x=>mode==='story'&&curLevel?curLevel.wi:Math.floor(Math.max(0
 const score=()=>run?Math.floor((cam/10+run.blood*5+run.sheep*25+run.bonks*10)*(up('throne')>=3?1.25:1)):0;
 
 function resetWorld(){
+  fadeIn=1;timeScale=1;
   applyTheme();if(mode==='story'&&curLevel)theme=THEMES[curLevel.world]||theme;
   cam=0;speed=0;ents=[];parts=[];texts=[];decorMid=[];decorNear=[];
   midNext=-150;nearNext=PX+80;
@@ -2476,6 +2605,7 @@ const addPower=(wx,y,kind)=>addEnt({type:'power',wx,y,kind:kind||pickPower(),ph:
 const addSheep=wx=>addEnt({type:'sheep',wx,y:G,ph:Math.random()*6,state:'graze',t:0,alert:false});
 
 function genSection(){
+  if(run&&run.tut&&gen.count<5){const len=genTut(gen.x,gen.count);gen.x+=len;gen.count++;gen.last='free';return;}
   const x0=gen.x,d=difficulty(x0),c=gen.count;
   let type,len;
   if(c>3&&x0>=gen.nextBoss){
@@ -2603,17 +2733,16 @@ function spawnDecor(){
 /* ================= Actions ================= */
 function startRun(){
   unlockAudio();
-  state='playing';stateT=0;run.skin=activeSkin();
-  P.vy=-480;P.expr='happy';P.exprT=0.7;
+  state='ready';stateT=0;run.skin=activeSkin();run.tut=mode==='endless'&&!save.tutDone&&!trialSkin;
+  P.vy=0;P.expr='happy';P.exprT=0;
   run.revives=up('throne')>=1?1:0;
   if(up('throne')>=2)P.screamN=Math.floor(screamCost()/2);
   if(up('library')>=3)P.pw.shield=4;
   const se=season();
-  for(const sk of SKINS)if(sk.how==='season'&&sk.season===se&&unlockSkin(sk.id)){run.unlocked.push(sk.name);toast(sk.name+' Sheepula unlocked! (event)');}
+  for(const sk of SKINS)if(sk.how==='season'&&sk.season===se&&unlockSkin(sk.id)){run.unlocked.push(sk.name);if(save.runs>=3)toast(sk.name+' Sheepula unlocked! (event)');}
   if(theme.id!=='night'&&!save.stats['tip_'+theme.id]){tipOnce('tip_'+theme.id,'Welcome to '+TW()[0].name+'! Grab the '+theme.item.many+'!');}
   else if(trialSkin){const sk=SKINS.find(x=>x.id===trialSkin);toast('Trying '+(sk?sk.name:'')+' Sheepula for one run');}
   missionsStart();
-  sfx.flap();puff(cam+PX-10,P.y+22,5);
 }
 function restart(){if(mode==='story'&&curLevel){startLevel(curLevel);return;}resetWorld();state='menu';startRun();}
 function tryRun(id){trialSkin=id;restart();}
@@ -2629,7 +2758,7 @@ function flap(){
 function addScream(n){
   const cost=screamCost(),was=P.screamN>=cost;
   P.screamN=Math.min(cost,P.screamN+n);
-  if(!was&&P.screamN>=cost){sfx.ready();if(!run.screamHint){run.screamHint=true;run.screamHintT=3.2;}}
+  if(!was&&P.screamN>=cost){sfx.ready();if(!run.screamHint&&!run.tut){run.screamHint=true;run.screamHintT=3.2;}}
 }
 function collectDrop(e){
   run.blood++;
@@ -2667,7 +2796,7 @@ function doScream(){
   if(state!=='playing'||P.dead)return;
   const cost=screamCost();
   if(P.screamN<cost){run.screamNudge=0.4;run.screamMsg=(cost-P.screamN)+' more '+theme.item.short+' to charge';run.screamMsgT=1.6;sfx.click();return;}
-  P.screamN=0;P.expr='angry';P.exprT=0.9;shake=11;sfx.scream();P.grace=Math.max(P.grace,0.5);save.stats.screams++;mEv('scream');
+  P.screamN=0;P.expr='angry';P.exprT=0.9;shake=11;sfx.scream();P.grace=Math.max(P.grace,0.5);save.stats.screams++;run.tutScreamed=true;mEv('scream');
   ring(cam+PX,P.y,C.blood,20,.7);ring(cam+PX,P.y,'#ffffff',10,.5);
   popText(cam+PX+20,P.y-44,'MWAHAHA!',C.blood,30);
   let n=0;
@@ -2703,6 +2832,7 @@ function die(cause){
 }
 function gameOver(){
   if(mode==='story'&&curLevel){storyFinish(false);return;}
+  if(run.tut){save.tutTries=(save.tutTries||0)+1;if(save.tutTries>=3)save.tutDone=1;}
   mEv('run');
   state='over';stateT=0;
   run.finalScore=score();
@@ -2910,7 +3040,7 @@ function updateEnt(e,dt){
         else if(!e.locked){e.locked=true;sfx.lock();}
         if(e.t<=0){if(sx-PX>90&&!P.dead)throwFork(e,true);e.throws=0;e.state='fist';e.t=0.5;}
       }else if(e.state==='wind'){
-        e.t-=dt;
+        e.t-=dt;if(e.tut&&!run.tutScreamed)e.t=Math.max(e.t,0.3);
         if(e.t<=0){
           if(sx-PX>110&&!P.dead){throwFork(e);e.throws--;}else e.throws=0;
           e.state=e.throws>0?'rewind':'fist';e.t=0.5;
@@ -2987,6 +3117,7 @@ function updateEnt(e,dt){
       break;
     case 'chest':e.ph+=dt;break;
     case 'marker':updateMarker(e,dt);break;
+    case 'tip':if(!e.fired&&cam+PX>e.wx){e.fired=1;e.dead=true;setTip(e.step);}break;
     case 'lamb':updateLamb(e,dt);break;
     case 'finish':updateFinish(e,dt);break;
     case 'rooster':
@@ -3124,11 +3255,14 @@ function updateFx(dt){
   for(const t of texts){t.y-=36*dt;t.life-=dt;}
 }
 function update(dt){
+  fadeIn=Math.max(0,fadeIn-dt*3.2);
+  if(state==='playing'&&run&&run.tut){timeScale=damp(timeScale,tutSlow()?0.3:1,7,dt);dt*=timeScale;}else timeScale=1;
   time+=dt;stateT+=dt;boil=Math.floor(time*7);
   shake=Math.max(0,shake-dt*40);flash=Math.max(0,flash-dt*2);
   if(state==='paused')return;
   if(state==='resuming'){resumeT-=dt;if(resumeT<=0){state='playing';}return;}
   updateBats(dt);
+  if(state==='ready'){readyTick(dt);updateFx(dt);return;}
   if(state==='menu'||state==='missions'||state==='story'||state==='cutscene'){menuIdle(dt);updateFx(dt);return;}
   if(state==='castle'){
     menuIdle(dt);updateFx(dt);stageT+=dt;castleMsgT=Math.max(0,castleMsgT-dt);castleShakeT=Math.max(0,castleShakeT-dt);
@@ -3144,13 +3278,13 @@ function update(dt){
   }else speed=damp(speed,0,2.2,dt);
   cam+=speed*dt;
   const wi=worldIndexAt(cam);
-  if(state==='playing'&&wi!==worldIdx){worldIdx=wi;if(mode==='story'&&curLevel)banner={text:curLevel.name,sub:'Level '+curLevel.code,t:-0.4};else if(wi===0||TW().length>1)banner={text:TW()[wi%TW().length].name,t:wi===0?-3.2:0};}
+  if(state==='playing'&&wi!==worldIdx){worldIdx=wi;if(mode==='story'&&curLevel)banner={text:curLevel.name,sub:'Level '+curLevel.code,t:-0.4};else if(!run.tut&&(wi===0||TW().length>1))banner={text:TW()[wi%TW().length].name,t:wi===0?-3.2:0};}
   if(banner){banner.t+=dt;if(banner.t>2.8)banner=null;}
   while(!gen.paused&&gen.x<cam+W+500)genSection();
   spawnDecor();
   updatePlayer(dt);
   for(const e of ents)updateEnt(e,dt);
-  if(state==='playing'){collide();missionsTick();}
+  if(state==='playing'){collide();missionsTick();tutTick(dt);}
   finishingTick(dt);
   if(run&&run.mPops&&run.mPops.length){run.mPops[0].t+=dt;if(run.mPops[0].t>2.9)run.mPops.shift();}
   updateFx(dt);
@@ -5325,7 +5459,7 @@ function drawEntities(){
         case 'lamb':drawLamb(e,sx);break;
         case 'finish':drawFinish(e,sx);break;
         case 'stake':drawStake(e,sx);break;
-        case 'sheep':drawSheepNPC(e,sx);break;
+        case 'sheep':drawSheepNPC(e,sx);drawSheepArrow(e,sx);break;
         case 'drop':drawDrop(e,sx);break;
         case 'power':drawPower(e,sx);break;
         case 'farmer':drawFarmer(e,sx);if(e.state==='wind'&&sx<W-20)exclaim(sx,G-128);if(e.state==='fastWind'&&sx<W-20){const b=Math.abs(Math.sin(time*16))*4;txt('!!',sx,G-134-b,{font:hand(36),col:C.blood,align:'center',sw:6});}break;
@@ -5449,6 +5583,8 @@ function drawHUD(){
       if(fb){ctx.globalAlpha=i<boss.hp?1:0.18;drawStrawHat(ex,by+24,0.42);ctx.globalAlpha=1;}
       else{ctx.beginPath();ctx.ellipse(ex,by+18,7,9,0,0,7);inkIt(i<boss.hp?'#fbf3e2':'rgba(245,233,218,0.12)',2);}}}
   const mpop=drawMissionPops(m,boss&&W<560);
+  drawTip(m);
+  if(state==='ready')drawReady();
   if(run.toastT>0){ctx.globalAlpha=Math.min(1,run.toastT*2);txt(run.toastMsg,W/2,m+(boss&&W<560?184:136)+(mpop?(boss&&W<560?56:64):0),{font:hand(fitSize(run.toastMsg,W-40,21)),col:C.gold,align:'center',sw:5});ctx.globalAlpha=1;}
   if(mode==='story')drawStoryHUD();
   iconButton(W-m-44,m,44,'pause',pause,2);
@@ -5472,14 +5608,9 @@ function drawHUD(){
   ctx.globalAlpha=1;
   txt(ready?'SCREAM':P.screamN+'/'+cost,cx,cy-r-8,{font:hand(16),col:ready?C.wool:C.dim,align:'center',sw:4});
   buttons.push({x:cx-r-10,y:cy-r-26,w:2*r+20,h:2*r+36,act:doScream});
+  drawTipPointers(cx,cy,r);
   if(run.screamMsgT>0){ctx.globalAlpha=Math.min(1,run.screamMsgT*2);txt(run.screamMsg,W-m,cy-r-32,{font:hand(19),col:C.wool,align:'right',sw:4});ctx.globalAlpha=1;}
   else if(run.screamHintT>0){ctx.globalAlpha=Math.min(1,run.screamHintT);txt(isTouch?'Scream ready! Tap the fangs':'Scream ready! Press S',W-m,cy-r-32,{font:hand(19),col:C.warn,align:'right',sw:4});ctx.globalAlpha=1;}
-  if(run.t<3.4&&save.runs<5&&state==='playing'){
-    ctx.globalAlpha=Math.min(1,(3.4-run.t)*2)*(0.75+0.25*Math.sin(time*6));
-    txt(isTouch?'Tap to flap!':'Click or Space to flap!',W/2,H*0.4,{font:hand(30),col:C.warn,align:'center',sw:6});
-    {const tl='Grab '+theme.item.many+'. Fly low over sheep to steal them.';txt(tl,W/2,H*0.4+30,{font:hand(fitSize(tl,W-32,19)),col:C.wool,align:'center',sw:4});}
-    ctx.globalAlpha=1;
-  }
   if(banner&&banner.t>0){
     const bossUp=W<560&&ents.some(e=>(e.type==='boss'||e.type==='fboss')&&e.state!=='wait'),BY=H*(bossUp?0.33:0.25);
     const t=banner.t,a=t<0.4?t/0.4:t>2.2?Math.max(0,(2.8-t)/0.6):1;
@@ -5669,12 +5800,12 @@ function drawMenu(){
    const x0=wide?W-16-w1-w2:W/2-(w1+w2)/2,y=H-12;
    txt(c1,x0,y,{font:hand(fs),col:'rgba(245,233,218,0.6)',stroke:null});txt(SITE,x0+w1,y,{font:hand(fs),col:'rgba(255,215,120,0.9)',stroke:null});
    ctx.fillStyle='rgba(255,215,120,0.55)';ctx.fillRect(x0+w1,y+3,w2,1.2);
-   siteLink={x:x0+w1-10,y:H-30,w:w2+20,h:30};buttons.push(Object.assign({act:()=>{}},siteLink));}
+   siteLink={x:x0+w1-10,y:H-30,w:w2+20,h:30,_ui:1};buttons.push({x:siteLink.x,y:siteLink.y,w:siteLink.w,h:siteLink.h,act:()=>{}});}
   iconButton(W-60,16,44,save.muted?'muted':'sound',toggleMute,4);
   const ML=TL('menu'),li=Math.floor(time/5)%ML.length,ph=time%5;
   if(ph>0.6&&ph<4.2&&P.expr!=='sleepy'){
-    const line=ML[li],bx=PX+34,fs=fitSize(line,W-bx-36,18);ctx.font=hand(fs);const tw=ctx.measureText(line).width;
-    const by=Math.max(P.y-88,byC+52),bw=tw+24,bh=34;
+    const line=ML[li],bx=uiW.px/uiK+34,fs=fitSize(line,W-bx-36,18);ctx.font=hand(fs);const tw=ctx.measureText(line).width;
+    const by=Math.max(uiW.py/uiK-88,byC+52),bw=tw+24,bh=34;
     wobRect(bx,by,bw,bh,li+1,1);inkIt('#fbf3e6',2.4);
     ctx.beginPath();ctx.moveTo(bx+16,by+bh-1);ctx.lineTo(bx+6,by+bh+14);ctx.lineTo(bx+30,by+bh-1);ctx.closePath();inkIt('#fbf3e6',2.4);
     ctx.fillStyle='#fbf3e6';ctx.fillRect(bx+15,by+bh-4,16,5);
@@ -5720,7 +5851,7 @@ function drawOverExtras(px,pw,y){
     const nm=RANKS[run.rankUp];txt(nm,px+72,y+40,{font:hand(fitSize(nm,pw-72-80,16)),col:C.wool,stroke:null});
     drawChestIcon(px+pw-58,y+22,0.5,0);txt('+'+(run.rankChests||1),px+pw-30,y+29,{font:hand(18),col:C.gold,align:'right',stroke:null});
     ctx.restore();
-    if(!run.rankFx&&stateT>0.9){run.rankFx=true;sfx.best();for(let i=0;i<36;i++)addPart({kind:'spark',x:cam+W/2+rand(-pw/2,pw/2),y:y+20,vx:rand(-160,160),vy:rand(-260,-60),life:rand(.7,1.2),size:rand(2.5,4.5),color:[C.gold,RANK_COL[run.rankUp],'#fff1a8'][i%3],grav:300});}
+    if(!run.rankFx&&stateT>0.9){run.rankFx=true;sfx.best();for(let i=0;i<36;i++)addPart({kind:'spark',x:cam+(W/2+rand(-pw/2,pw/2))*uiK,y:(y+20)*uiK,vx:rand(-160,160),vy:rand(-260,-60),life:rand(.7,1.2),size:rand(2.5,4.5),color:[C.gold,RANK_COL[run.rankUp],'#fff1a8'][i%3],grav:300});}
     y+=50;
   }
   return y;
@@ -5765,7 +5896,7 @@ let castleTab='upgrades',castleMsg='',castleMsgT=0,castleShakeId='',castleShakeT
 let castlePage=0,chestAnim=null,previewId='classic',stageT=0,stageFly=false;
 function openWardrobe(){openCastle();castleTab='skins';}
 function setPreview(id){if(previewId!==id){previewId=id;stageT=0;sfx.click();}const i=SKINS.findIndex(sk=>sk.id===id);if(i>=0)castlePage=Math.floor(i/6);}
-function openCastle(){if(mode==='story'){mode='endless';curLevel=null;resetWorld();}else if(state!=='menu')resetWorld();state='castle';stateT=0;castleMsgT=0;sfx.click();previewId=save.skin;stageT=0;castlePage=Math.floor(Math.max(0,SKINS.findIndex(sk=>sk.id===save.skin))/6);const got=checkUnlocks();if(got.length)castleSay(got.join(', ')+' Sheepula unlocked!');}
+function openCastle(){fadeIn=Math.max(fadeIn,0.6);if(mode==='story'){mode='endless';curLevel=null;resetWorld();}else if(state!=='menu')resetWorld();state='castle';stateT=0;castleMsgT=0;sfx.click();previewId=save.skin;stageT=0;castlePage=Math.floor(Math.max(0,SKINS.findIndex(sk=>sk.id===save.skin))/6);const got=checkUnlocks();if(got.length)castleSay(got.join(', ')+' Sheepula unlocked!');}
 function castleSay(msg,shakeId){castleMsg=msg;castleMsgT=1.9;if(shakeId){castleShakeId=shakeId;castleShakeT=0.4;}}
 function castleBurst(){
   if(!castleBox)return;
@@ -6072,9 +6203,9 @@ function draw(){
   if(lineupSpec){drawLineup();return;}
   const pal=palette();
   if(state==='castle'){
-    withTheme(castleTab==='skins'?THEMES[themeForSkin(previewId)]:theme,()=>drawCastleScreen(palette()));
+    ui(()=>withTheme(castleTab==='skins'?THEMES[themeForSkin(previewId)]:theme,()=>drawCastleScreen(palette())));
     if(flash>0){ctx.globalAlpha=flash*0.45;ctx.fillStyle=flashCol;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
-    return;
+    drawFade();return;
   }
   ctx.save();
   if(shake>0)ctx.translate(rand(-1,1)*shake*0.5,rand(-1,1)*shake*0.5);
@@ -6102,15 +6233,20 @@ function draw(){
     ctx.fillStyle=vg;ctx.fillRect(0,0,W,H);ctx.fillStyle=`rgba(120,0,25,${a})`;ctx.fillRect(0,0,W,H);
   }
   ctx.save();ctx.globalAlpha=0.55;ctx.fillStyle=grainPat;ctx.fillRect(0,0,W,H);ctx.restore();
-  if(state==='menu')drawMenu();
-  else if(state==='missions')drawMissionsScreen();
-  else if(state==='story')drawStoryMap();
-  else if(state==='cutscene')drawCutscene();
-  else if(state==='playing'||state==='dying'||state==='paused'||state==='resuming'||state==='finishing')drawHUD();
-  if(state==='paused')drawPaused();
-  if(state==='resuming')drawResuming();
-  if(state==='over'){drawOver();if(run.rankFx)drawParts();}
+  uiW={px:PX,py:P.y};
+  ui(()=>{
+    if(state==='menu')drawMenu();
+    else if(state==='missions')drawMissionsScreen();
+    else if(state==='story')drawStoryMap();
+    else if(state==='cutscene')drawCutscene();
+    else if(state==='playing'||state==='dying'||state==='paused'||state==='resuming'||state==='finishing'||state==='ready')drawHUD();
+    if(state==='paused')drawPaused();
+    if(state==='resuming')drawResuming();
+    if(state==='over')drawOver();
+  });
+  if(state==='over'&&run.rankFx)drawParts();
   if(flash>0){ctx.globalAlpha=flash*0.45;ctx.fillStyle=flashCol;ctx.fillRect(0,0,W,H);ctx.globalAlpha=1;}
+  drawFade();
 }
 let last=performance.now();
 function frame(now){
@@ -6127,6 +6263,7 @@ function toVirtual(e){const r=cv.getBoundingClientRect();return {x:(e.clientX-r.
 function press(x,y){
   for(let i=buttons.length-1;i>=0;i--){const b=buttons[i];if(x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h){b.act();return;}}
   if(state==='menu')startRun();
+  else if(state==='ready')go();
   else if(state==='playing')flap();
   else if(state==='paused')resume();
   else if(state==='over'&&stateT>0.6)overPrimary();
@@ -6149,7 +6286,7 @@ window.addEventListener('keydown',e=>{
   const k=e.code;
   if(k==='Space'||k==='ArrowUp'||k==='KeyW'||k==='Enter'||k==='NumpadEnter'){
     e.preventDefault();if(e.repeat)return;unlockAudio();pointerIdle=0;
-    if(state==='menu')startRun();else if(state==='playing')flap();else if(state==='paused')resume();else if(state==='over'&&stateT>0.5)overPrimary();else if(state==='castle'||state==='missions')restart();else if(state==='cutscene')cutNext();else if(state==='finishing')skipFinish();else if(state==='story'&&storySel)startLevel(storySel);
+    if(state==='menu')startRun();else if(state==='ready')go();else if(state==='playing')flap();else if(state==='paused')resume();else if(state==='over'&&stateT>0.5)overPrimary();else if(state==='castle'||state==='missions')restart();else if(state==='cutscene')cutNext();else if(state==='finishing')skipFinish();else if(state==='story'&&storySel)startLevel(storySel);
   }else if(k==='KeyP'||k==='Escape'){if(state==='playing')pause();else if(state==='paused')resume();else if(state==='castle'&&k==='Escape')goMenu();else if(state==='missions')closeMissions();else if(state==='story')goMenu();else if(state==='cutscene'){state='story';stateT=0;}}
   else if(k==='KeyS'||k==='KeyX'||k==='ShiftLeft'||k==='ShiftRight'){if(!e.repeat)doScream();}
   else if(k==='KeyM')toggleMute();
@@ -6163,6 +6300,7 @@ try{new ResizeObserver(()=>resize()).observe(cv);}catch(e){}
 
 /* ================= Boot ================= */
 resize();resetWorld();
+if(!save.tutDone&&!save.runs)startRun();
 requestAnimationFrame(t=>{last=t;requestAnimationFrame(frame);});
 
 /* Test hooks for automated play-testing (harmless in normal play) */
@@ -6198,3 +6336,5 @@ if(location.protocol==='file:')window.__sheepula={
 };
 })();
 </script>
+
+</body></html>
