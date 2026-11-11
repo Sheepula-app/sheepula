@@ -1,8 +1,4 @@
-<!doctype html>
-<html lang="en">
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#1a1230">
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!-- Sheepula: The Fluffy Menace. © 2026 Moonfluff Studio. All rights reserved. https://sheepula.com -->
 <title>Sheepula</title>
 <!--
@@ -1826,7 +1822,8 @@ const UPGRADES=[
   {id:'pen',name:'Sheep Pen',cost:[40,110,260],sheep:[1,4,10],desc:['Grab sheep from afar, +2 berries','Longer reach, +4 berries','Longest reach, +6 berries']},
   {id:'tower',name:'Vampire Tower',cost:[50,140,300],sheep:[0,3,8],desc:['Power-ups last 25% longer','Power-ups last 50% longer','Power-ups last 75% longer']},
   {id:'library',name:'Library',cost:[60,150,320],sheep:[0,3,8],desc:['More power-ups','Even more power-ups','Start each run shielded']},
-  {id:'throne',name:'Throne Room',cost:[200,400,700],sheep:[5,12,20],desc:['Survive one crash per run','Start with half a Scream','All scores +25%']},
+  {id:'garden',name:'Heart Garden',cost:[150,350,650],sheep:[4,10,18],desc:['Start every run with 2 hearts','Hearts show up more often','Bosses give 2 hearts']},
+  {id:'throne',name:'Throne Room',cost:[200,400,700],sheep:[5,12,20],desc:['All scores +10%','All scores +20%','All scores +30%']},
 ];
 const SKINS=[
   {id:'classic',name:'Classic',how:'free'},
@@ -1843,7 +1840,7 @@ const SKINS=[
   {id:'king',name:'King',how:'challenge',label:'Steal 100 sheep',prog:()=>[save.sheep,100]},
   {id:'sleepy',name:'Sleepy',how:'challenge',rare:true,label:'Play 25 runs',prog:()=>[save.runs,25]},
   {id:'alien',name:'Alien',how:'challenge',rare:true,label:'Scream 15 times',prog:()=>[save.stats.screams,15]},
-  {id:'golden',name:'Royal Golden',how:'challenge',rare:true,label:'Build all 5 rooms',prog:()=>[UPGRADES.filter(u=>up(u.id)>0).length,5]},
+  {id:'golden',name:'Royal Golden',how:'challenge',rare:true,label:'Build 5 castle rooms',prog:()=>[UPGRADES.filter(u=>up(u.id)>0).length,5]},
   {id:'trex',name:'T-Rex',how:'challenge',rare:true,label:'Clear Story Chapter 2',prog:()=>[save.story&&save.story.done&&save.story.done['2-7']?1:0,1],world:'jungle'},
   {id:'santa',name:'Santa',how:'season',season:'christmas',label:'December event',world:'winter'},
   {id:'ghost',name:'Ghost',how:'season',season:'halloween',label:'Halloween event'},
@@ -1868,9 +1865,9 @@ const activeSkin=()=>trialSkin||save.skin;
 function themeForSkin(id){const sk=SKINS.find(x=>x.id===id);return (sk&&sk.world)||'night';}
 function applyTheme(){theme=THEMES[themeForSkin(activeSkin())];}
 if(!owns(save.skin))save.skin='classic';
-const screamCost=()=>CONFIG.screamCost-4*up('cellar');
-const pwDur=k=>CONFIG.pw[k]*(1+0.25*up('tower'));
-const powerChance=()=>CONFIG.powerChance+0.15*Math.min(2,up('library'));
+const screamCost=()=>Math.round((CONFIG.screamCost-4*up('cellar'))*(hasPerk('classic')?0.85:1));
+const pwDur=k=>CONFIG.pw[k]*(1+0.25*up('tower'))*((k==='shield'&&hasPerk('beach'))||(k==='boost'&&hasPerk('astronaut'))?1.5:(k==='magnet'&&hasPerk('cyber'))?1.4:1);
+const powerChance=()=>(CONFIG.powerChance+0.15*Math.min(2,up('library')))*(hasPerk('wizard')?1.5:1);
 function canBuy(u){const l=up(u.id);return l<3&&save.blood>=u.cost[l]&&save.sheep>=u.sheep[l];}
 function season(){const d=new Date(),m=d.getMonth()+1,day=d.getDate();if((m===10&&day>=15)||(m===11&&day<=7))return 'halloween';if(m===12)return 'christmas';return null;}
 function unlockSkin(id){if(owns(id))return false;save.skins.push(id);persist();return true;}
@@ -1933,7 +1930,8 @@ if(!save.mis.act.length&&!save.runs)for(const id of ['rb','rs','fg'])save.mis.ac
 while(save.mis.act.length<3)save.mis.act.push(newMission());
 
 function mEv(ev,v,max){
-  if(!run)return;if(v==null)v=1;
+  if(!run||trialSkin)return;if(v==null)v=1;
+  dailyProgress(ev,v);
   for(const m of save.mis.act){
     if(!m||m.ok)continue;const d=MDEF[m.id];if(d.ev!==ev)continue;
     if(d.run)m.rp=max?Math.max(m.rp||0,v):(m.rp||0)+v;else m.p=(m.p||0)+v;
@@ -2192,7 +2190,8 @@ function genEnemiesPool(x0,d,pool){
 function buildLevel(lv){
   const R=Math.random;Math.random=mulberry32(strSeed('sheepula'+lv.id));
   try{
-    const end=PX+lv.len*10;let c=0;gen.x=PX+260;
+    let end=PX+lv.len*10;let c=0;gen.x=PX+260;run.lvX0=0;
+    if(run.tut){for(let t=0;t<5;t++)gen.x+=genTut(gen.x,t);run.lvX0=gen.x-260;end=gen.x+lv.len*10*0.7;}
     while(gen.x<end-300){
       const x0=gen.x,d=lv.d;let type,len;
       if(c===0)type=lv.intro?'intro':'free';
@@ -2211,7 +2210,7 @@ function buildLevel(lv){
 }
 function clearSpot(x,y,r){for(const e of ents)if((e.type==='drop'||e.type==='power')&&Math.abs(e.wx-x)<r&&Math.abs(e.y-y)<r)e.dead=true;}
 function placeLambs(lv){
-  const x0=PX+420,x1=run.finishX-260,stakes=ents.filter(e=>e.type==='stake');
+  const x0=(run.lvX0||PX)+420,x1=run.finishX-260,stakes=ents.filter(e=>e.type==='stake');
   lv.lambs.forEach((sp,i)=>{
     if(sp.k==='boss')return;
     const tx=lerp(x0,x1,sp.f);let k=sp.k,x=tx,y;
@@ -2314,9 +2313,11 @@ function drawFinishFront(){
 }
 function storyFinish(win){
   const lv=curLevel;
+  if(!win&&run.tut){save.tutTries=(save.tutTries||0)+1;if(save.tutTries>=3)save.tutDone=1;}
   mEv('run');if(win)mEv('level');
   state='over';stateT=0;run.finalScore=score();run.newBest=false;
   const S=run.story={win,lv,got:run.lambs||0,prev:+save.story.stars[lv.id]||0,first:false,reward:0,newStars:0,chapter:false};
+  if(hasPerk('business')&&run.blood>0){run.interest=Math.ceil(run.blood*0.1);run.blood+=run.interest;}
   save.blood+=run.blood;save.sheep+=run.sheep;save.runs++;
   save.stats.meters+=cam/10;save.stats.bestBlood=Math.max(save.stats.bestBlood,run.blood);
   save.chests+=run.chests;save.stats.chestsFound+=run.chests;
@@ -2630,6 +2631,7 @@ function go(){
   if(state!=='ready')return;
   state='playing';stateT=0;P.vy=CONFIG.flapVel;P.flapK=1;P.expr='happy';P.exprT=0.5;
   sfx.flap();puff(cam+PX-10,P.y+22,5);
+  if(hasPerk('sleepy')&&!run.tut)popText(cam+PX+30,P.y-50,'Zzz... power nap',C.wool,20);
 }
 function drawTapHand(x,y,ph){
   // a chunky cartoon glove with a red cuff, tapping the screen; ripples where the fingertip lands
@@ -2667,13 +2669,17 @@ function drawKeycap(label,x,y,w,ph){
 }
 function drawReady(){
   const a=Math.min(1,stateT*3);ctx.save();ctx.globalAlpha=a;
-  const title=mode==='story'&&curLevel?curLevel.name:'Get ready!';
+  const title=mode==='story'&&curLevel?curLevel.name:run&&run.daily?'Daily Raid':'Get ready!';
   const cy=H*0.29;
   txt(title,W/2,cy,{font:disp(Math.round(clamp(fitSize(title,W-30,52),30,52))),col:C.wool,align:'center',sw:7});
   const l1=isTouch?'Tap to fly!':'Click or press Space to fly!';
   txt(l1,W/2,cy+40,{font:hand(fitSize(l1,W-40,27)),col:C.warn,align:'center',sw:5});
   const l2=isTouch?'Tap again and again to stay in the air':'Keep tapping to stay in the air';
   txt(l2,W/2,cy+68,{font:hand(fitSize(l2,W-40,18)),col:C.wool,align:'center',sw:4});
+  {let yy=cy+96;
+   if(run.daily){const g='Goal: '+run.daily.txt+'   ·   '+THEMES[run.daily.world].worlds[0].name+(run.daily.done?'   ·   done today':'');txt(g,W/2,yy,{font:hand(fitSize(g,W-40,20)),col:C.gold,align:'center',sw:4});yy+=26;}
+   if(!run.tut){const pl=perkLine(run.skin||activeSkin());if(pl){txt(pl,W/2,yy,{font:hand(fitSize(pl,W-40,17)),col:'#ffe08a',align:'center',sw:4});yy+=22;}}
+   if(save.relaxed&&!run.tut)txt('Relaxed mode is on',W/2,yy,{font:hand(16),col:'#9be8a8',align:'center',sw:3});}
   const px=uiW.px/uiK,py=uiW.py/uiK,ph=time*1.6;
   if(isTouch)drawTapHand(px+96,py+46,time*0.9);
   else{drawKeycap('SPACE',px+110,py-8,96,ph);txt('or click',px+110,py+52,{font:hand(15),col:C.dim,align:'center',sw:3});}
@@ -2708,7 +2714,7 @@ function tutTick(dt){
   else if(T.step==='enemy'&&T.t>2.4)T.done=true;
 }
 const TIP_TXT={berry:()=>'Grab the '+theme.item.many+'!',sheep:()=>'Fly LOW over the sheep to steal it!',
-  scream:()=>isTouch?'The farmer! Tap the fangs to SCREAM!':'The farmer! Press S to SCREAM!',gap:()=>'Squeeze through the gaps!',done:()=>'You got it! Now fly as far as you can!'};
+  scream:()=>isTouch?'The farmer! Tap the fangs to SCREAM!':'The farmer! Press S to SCREAM!',gap:()=>'Squeeze through the gaps!',done:()=>mode==='story'?'You got it! Now save all 3 lambs!':'You got it! Now fly as far as you can!'};
 function drawTip(m){
   const T=run&&run.tip;if(!T)return;
   const a=T.done?Math.max(0,1-T.fade/0.6):Math.min(1,T.t*5),line=T.text||TIP_TXT[T.step]();
@@ -2873,7 +2879,7 @@ function setMapWorld(world){
 }
 function playCut(slides,title,onDone){curCut=slides;cutTitle=title;cutDone=onDone||null;cutIdx=0;state='cutscene';stateT=0;fadeIn=Math.max(fadeIn,0.5);}
 function finishCut(){const f=cutDone;cutDone=null;sfx.click();if(f)f();else{state='story';stateT=0;storySel=defaultSel();}}
-function startLevelNow(lv){mode='story';curLevel=lv;trialSkin=null;resetWorld();buildLevel(lv);state='menu';startRun();}
+function startLevelNow(lv){mode='story';curLevel=lv;trialSkin=null;resetWorld();run.tut=!save.tutDone&&lv.id==='1-1';buildLevel(lv);state='menu';startRun();}
 function switchChapter(d){
   const n=clamp(storyCh+d,0,CHAPTERS.length-1);if(n===storyCh)return;
   storyCh=n;const ch=CHAPTERS[n];setMapWorld(ch.world);state='story';stateT=0;storySel=defaultSel();sfx.click();
@@ -2959,6 +2965,258 @@ CHAPTERS[1].cuts=CH2_CUTS;CHAPTERS[1].teaser='Sun, sand and one very rude seagul
 Object.assign(LEVEL_BLURB,{'2-1':'Sunscreen on, sheep out! The farmer is on vacation.','2-2':'Sandcastles everywhere. Squeeze through!','2-3':'Seagulls! They drop ice cream. On purpose.',
   '2-4':'Sneaky traps hide in the sand. Fly high!','2-5':'Water balloons incoming! Find the gaps.','2-6':'The sun is setting and EVERYONE is angry.','2-7':"Captain Gull stole Nugget's ice cream... and Nugget!"});
 
+
+/* ================= Wool hearts, skippable tutorial, readable UI in small windows ================= */
+function drawLifeHeart(x,y,sz,full){
+  ctx.save();ctx.translate(x,y);ctx.scale(sz/10,sz/10);ctx.lineJoin='round';
+  ctx.beginPath();ctx.moveTo(0,8);ctx.bezierCurveTo(-11,1,-10,-9,-4.6,-9);ctx.bezierCurveTo(-1.8,-9,0,-6.6,0,-5);ctx.bezierCurveTo(0,-6.6,1.8,-9,4.6,-9);ctx.bezierCurveTo(10,-9,11,1,0,8);ctx.closePath();
+  if(full){inkIt('#ff4d6d',2.2);ctx.fillStyle='rgba(255,255,255,0.65)';ctx.beginPath();ctx.ellipse(-4.4,-4.6,2.2,1.4,-0.6,0,7);ctx.fill();}
+  else{ctx.fillStyle='rgba(20,13,34,0.55)';ctx.fill();ctx.setLineDash([2.5,2.5]);ctx.strokeStyle='rgba(245,233,218,0.55)';ctx.lineWidth=1.6;ctx.stroke();ctx.setLineDash([]);}
+  ctx.restore();
+}
+function drawHearts(x,y){
+  if(!run||!run.maxHearts)return;const fx=Math.max(0,run.heartFx||0),sh=fx>0?Math.sin(time*60)*3*fx:0;
+  for(let i=0;i<run.maxHearts;i++){const hx=x+i*24+sh,full=i<run.hearts;
+    if(!full&&i===run.hearts&&fx>0){const k=1-fx/0.7;ctx.save();ctx.globalAlpha*=1-k;drawLifeHeart(hx,y-k*14,11*(1+k*0.8),true);ctx.restore();}
+    drawLifeHeart(hx,y,11,full);
+    if(full&&run.hearts===1&&run.hits>0&&state==='playing'){ctx.save();ctx.globalAlpha=0.35+0.35*Math.sin(time*8);drawLifeHeart(hx,y,15,true);ctx.restore();}}
+}
+function skipTut(){
+  save.tutDone=1;persist();if(run){run.tut=false;run.tip=null;}timeScale=1;
+  for(const e of ents){if(e.type==='tip')e.dead=true;if(e.tut)e.tut=0;}
+  sfx.click();toast('Tutorial skipped. Have fun!');
+}
+const IN_GAME_STATES=['ready','playing','dying','paused','resuming','finishing','menu'];
+function overNeedH(){
+  if(!run)return 640;
+  if(run.story){const S=run.story,lv=S.lv,nc=CHAPTERS[CHAPTERS.indexOf(lv.ch)+1];return 292+(S.first&&S.win?14:0)+overExtrasH()+(S.chapter?30+(nc?26:0):0)+(!S.win&&deathInfo()?52:0)+60;}
+  const ms=run.mSnap||[],ul=run.unlocked.length||run.trialName,ru=run.rankUp!=null;
+  return 330+(ms.length?ms.length*26+12:0)+(ul?26:0)+(ru?54:0)+(deathInfo()?52:0)+(run.offerRelax?52:0)+60;
+}
+// In wide windows the world is zoomed in (540 units tall). Menus keep their 640 layout, but everything
+// you see while playing uses the bigger scale so text stays readable in small 16:9 iframes.
+function uiScaleFor(st){
+  const base=Math.min(1,H/640);if(base>=1)return 1;
+  if(IN_GAME_STATES.includes(st))return 1;
+  if(st==='over')return Math.min(1,H/Math.max(H,overNeedH()));
+  return base;
+}
+
+
+/* ================= Skin perks: every Sheepula has its own little power ================= */
+const PERKS={
+  classic:{name:'Old Faithful',desc:'Scream charges 15% faster'},
+  zombie:{name:'Already Dead',desc:'The first hit each run costs no heart'},
+  pirate:{name:'Treasure Nose',desc:'Treasure chests show up twice as often'},
+  beach:{name:'SPF 50',desc:'Shields last 50% longer'},
+  ski:{name:'Snow Brakes',desc:'The first ground bump each run is free'},
+  wizard:{name:'Abracadabra',desc:'Power-ups show up more often'},
+  devil:{name:'Hot Scream',desc:'Your Scream reaches much further'},
+  cyber:{name:'Wi-Fi Magnet',desc:'Magnets last longer and pull from further'},
+  rainbow:{name:'Sugar Rush',desc:'Every 10th pickup counts double'},
+  ninja:{name:'Shadow Step',desc:'Longer safety blink after a hit'},
+  astronaut:{name:'Rocket Fuel',desc:'Bat Boost lasts 50% longer'},
+  king:{name:'Royal Tax',desc:'Every stolen sheep pays +3 {item}'},
+  sleepy:{name:'Power Nap',desc:'Every run starts in calm slow motion'},
+  alien:{name:'Beam Me Up',desc:'Your Scream beams up the nearest sheep'},
+  golden:{name:'Midas Wool',desc:'Every power-up also gives +5 {item}'},
+  trex:{name:'ROAR',desc:'Your Scream knocks out flying enemies'},
+  santa:{name:'Ho Ho Ho',desc:'Stolen sheep leave a trail of presents'},
+  ghost:{name:'Boo-Through',desc:'Fly through one obstacle per run'},
+  count:{name:"Count's Stare",desc:'Bosses stay dizzy longer'},
+  farmhand:{name:'Inside Man',desc:'Farmers sometimes "forget" to throw'},
+  disco:{name:'Dance Floor',desc:'After a Scream, new enemies dance away for 4 s'},
+  business:{name:'Compound Interest',desc:'+10% {item} at the end of every run'},
+  pghost:{name:'Ghost Ship',desc:'Start every run with a shield'},
+};
+function hasPerk(id){return ((run&&run.skin)||activeSkin())===id;}
+function perkDesc(p){return p.desc.replace('{item}',theme.item.many);}
+function perkLine(id){const p=PERKS[id];return p?'Perk: '+p.name+'  ·  '+perkDesc(p):'';}
+function perkSave(label){P.grace=Math.max(P.grace,1.3);P.vy=-440;if(P.y>G-60)P.y=G-60;shake=Math.max(shake,6);sfx.bonk();ring(cam+PX,P.y,C.gold,16,.5);popText(cam+PX,P.y-44,label,C.gold,24);}
+function discoTick(dt){
+  if(!run||!(run.discoT>0))return;run.discoT-=dt;
+  for(const e of ents){if(e.dead||e.disco)continue;const sx=e.wx-cam;if(sx<PX-20||sx>W+30)continue;
+    if((e.type==='chicken'||e.type==='hen'||e.type==='rooster'||e.type==='farmer')&&e.state!=='flee'&&e.state!=='pending'&&!(e.type==='rooster'&&e.state==='warn')){scare(e);e.disco=1;popText(e.wx,(e.y||G-80)-30,'GROOVY!','#ff7ad9',20);}
+    else if(e.type==='hunter'&&e.state!=='flee'){e.state='flee';e.disco=1;popText(e.wx,G-150,'GROOVY!','#ff7ad9',20);}}
+}
+
+
+/* ================= Settings, Relaxed mode, Daily Raid and the Sheep Book ================= */
+if(!save.vol||typeof save.vol!=='object')save.vol={mus:1,sfx:1};
+function applyVolumes(){if(!AC||!sfxBus)return;try{sfxBus.gain.setTargetAtTime(0.55*save.vol.sfx,AC.currentTime,0.03);musBus.gain.setTargetAtTime(0.22*save.vol.mus,AC.currentTime,0.03);}catch(e){}}
+function openSettings(){state='settings';stateT=0;fadeIn=Math.max(fadeIn,0.4);sfx.click();}
+function closeSettings(){state='menu';stateT=0;sfx.click();}
+function drawToggle(x,y,w,h,on,act,seed){
+  wobRect(x,y,w,h,seed,1);inkIt(on?'#3fae5a':'rgba(30,21,48,0.92)',2.4,on?C.ink:'rgba(245,233,218,0.6)');
+  const kx=on?x+w-h/2:x+h/2;ctx.beginPath();ctx.arc(kx,y+h/2,h/2-6,0,7);inkIt(C.wool,2);
+  txt(on?'ON':'OFF',on?x+14:x+w-14,y+h/2+6,{font:hand(17),col:on?C.wool:C.dim,align:on?'left':'right',stroke:null});
+  buttons.push({x,y,w,h,act});
+}
+function drawVolume(x,y,w,key,seed){
+  const steps=5,gap=7,sw=(w-gap*(steps-1))/steps,cur=Math.round(save.vol[key]*4);
+  for(let i=0;i<steps;i++){const bx=x+i*(sw+gap),on=cur>0&&i<=cur,h=12+i*6;
+    wobRect(bx,y+34-h,sw,h,seed+i,0.8);inkIt(on?C.warn:'rgba(30,21,48,0.85)',2,on?C.ink:'rgba(245,233,218,0.45)');
+    buttons.push({x:bx,y:y-6,w:sw,h:46,act:()=>{save.vol[key]=i/4;persist();applyVolumes();if(key==='sfx')sfx.click();}});}
+}
+function drawSettings(){
+  ctx.fillStyle='rgba(10,5,20,0.72)';ctx.fillRect(0,0,W,H);
+  const pw=Math.min(W-28,420),px=W/2-pw/2,top=Math.max(0,Math.round((H-600)*0.4));
+  iconButton(16,16,44,'back',closeSettings,9);
+  txt('Settings',W/2,top+60,{font:disp(Math.round(clamp(W*0.1,34,46))),col:C.blood,align:'center',sw:7});
+  wobRect(px,top+84,pw,470,121,1.4);inkIt('rgba(36,26,58,0.94)',2.6,'rgba(245,233,218,0.45)');
+  const lx=px+22,rw=pw-44;let y=top+124;
+  const row=(label,val)=>{txt(label,lx,y,{font:hand(23),sw:4});if(val!=null)txt(val,px+pw-22,y,{font:hand(19),col:C.dim,align:'right',stroke:null});};
+  row('Music',save.vol.mus?Math.round(save.vol.mus*100)+'%':'Off');drawVolume(lx,y+10,rw,'mus',130);y+=86;
+  row('Sound effects',save.vol.sfx?Math.round(save.vol.sfx*100)+'%':'Off');drawVolume(lx,y+10,rw,'sfx',140);y+=80;
+  txt('Screen shake',lx,y+28,{font:hand(23),sw:4});drawToggle(px+pw-22-104,y,104,42,!save.noShake,()=>{save.noShake=!save.noShake;persist();sfx.click();if(!save.noShake)shake=8;},150);y+=66;
+  txt('Relaxed mode',lx,y+28,{font:hand(23),sw:4});drawToggle(px+pw-22-104,y,104,42,!!save.relaxed,()=>{save.relaxed=!save.relaxed;persist();sfx.click();},151);
+  wrapLines('Wider gaps, slower flying and 3 hearts. Great for younger pilots and relaxed evenings.',rw,hand(17)).forEach((l,i)=>txt(l,lx,y+68+i*21,{font:hand(17),col:C.dim,stroke:null}));y+=124;
+  if(save.muted){const t='All sound is muted with the speaker button.';txt(t,W/2,y,{font:hand(fitSize(t,rw,17)),col:C.warn,align:'center',sw:3});}
+}
+/* ---- Relaxed mode offer after a few quick crashes ---- */
+function drawRelaxOffer(x,y,w){
+  if(!run||!run.offerRelax)return 0;
+  wobRect(x,y,w,46,89,1);inkIt('rgba(63,174,90,0.14)',1.8,'rgba(124,220,140,0.7)');
+  const on=!!save.relaxed,t1=on?'Relaxed mode is on!':'Tricky? Try Relaxed mode',t2=on?'Wider gaps and 3 hearts from the next run.':'Wider gaps, slower flying, 3 hearts.';
+  txt(t1,x+12,y+19,{font:hand(fitSize(t1,w-120,17)),col:'#9be8a8',sw:3});txt(t2,x+12,y+38,{font:hand(fitSize(t2,w-120,14)),col:C.wool,stroke:null});
+  if(!on)button(x+w-100,y+6,92,34,'Turn on',()=>{save.relaxed=true;persist();sfx.power();},true,152);
+  return 52;
+}
+/* ---- Daily Raid: one shared course a day, a small goal and a chest ---- */
+const DAILY_GOALS=[{ev:'sheep',ns:[4,5,6],t:'Steal {n} sheep'},{ev:'berry',ns:[50,70,90],t:'Grab {n} {item}'},{ev:'bonk',ns:[5,7,9],t:'Bonk or scare {n} enemies'},
+  {ev:'scream',ns:[2,3,4],t:'Scream {n} times'},{ev:'power',ns:[2,3,4],t:'Grab {n} power-ups'},{ev:'meters',ns:[500,700,900],t:'Fly {n} m'}];
+if(!save.daily||typeof save.daily!=='object')save.daily={done:'',streak:0};
+function dayKey(d){d=d||new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+function dayNum(){const d=new Date();return Math.floor(Date.UTC(d.getFullYear(),d.getMonth(),d.getDate())/864e5);}
+const BOOK_WORLDS=()=>[...new Set(SKINS.map(sk=>themeForSkin(sk.id)))];
+function dailyInfo(){
+  const key=dayKey(),r=mulberry32(strSeed('raid'+key)),g=DAILY_GOALS[Math.floor(r()*DAILY_GOALS.length)],n=g.ns[Math.floor(r()*g.ns.length)];
+  const ws=BOOK_WORLDS(),world=ws[dayNum()%ws.length];
+  return {key,ev:g.ev,n,world,txt:g.t.replace('{n}',n).replace('{item}',THEMES[world].item.many)};
+}
+const dailyDone=()=>save.daily.done===dayKey();
+function startDaily(){
+  const D=dailyInfo();mode='endless';curLevel=null;trialSkin=null;resetWorld();
+  if(theme.id!==D.world&&THEMES[D.world]){theme=THEMES[D.world];decorMid=[];decorNear=[];midNext=-150;nearNext=PX+80;spawnDecor();}
+  run.daily=Object.assign(D,{p:0,done:dailyDone(),rng:mulberry32(strSeed('raidgen'+D.key))});
+  state='menu';startRun();
+}
+function dailyProgress(ev,v){const d=run&&run.daily;if(!d||d.ev!==ev||state!=='playing')return;d.p+=v;dailyCheck();}
+function dailyCheck(){
+  const d=run&&run.daily;if(!d||d.done||d.p<d.n)return;d.done=true;
+  if(!dailyDone()){const y=new Date();y.setDate(y.getDate()-1);save.daily.streak=save.daily.done===dayKey(y)?(save.daily.streak||0)+1:1;save.daily.done=d.key;save.chests++;persist();
+    run.dailyWon=true;toast('DAILY RAID COMPLETE!  +1 chest');sfx.best();flash=0.3;flashCol=C.gold;burst(cam+PX,P.y,22,C.gold,240);}
+}
+function dailyTick(){const d=run&&run.daily;if(d&&d.ev==='meters'){d.p=Math.floor(cam/10);dailyCheck();}}
+function drawDailyPill(x,y){
+  const d=run&&run.daily;if(!d)return;
+  const t=d.done?(run.dailyWon?'Daily Raid complete!':'Daily Raid done today ✓'):'Daily: '+d.txt+'   '+Math.min(d.p,d.n)+' / '+d.n,fs=fitSize(t,Math.min(W-150,330),17);
+  ctx.font=hand(fs);const w=ctx.measureText(t).width+26;
+  wobRect(x,y,w,34,123,1);inkIt('rgba(30,21,48,0.88)',2,d.done?C.gold:'rgba(255,210,63,0.7)');
+  txt(t,x+13,y+23,{font:hand(fs),col:d.done?C.gold:C.wool,stroke:null});
+}
+function drawDailyButton(x,y,w,h){
+  const done=dailyDone(),b={x,y,w,h,act:startDaily},hov=inBtn(b),o=hov?-2:0;
+  wobRect(x,y+o,w,h,124,1.2);inkIt(done?'rgba(30,21,48,0.9)':'#c9902a',2.6,done?'rgba(255,210,63,0.7)':C.ink);
+  drawChestIcon(x+22,y+h/2+o+1,0.5,done);
+  txt('Daily Raid',x+42,y+20+o,{font:hand(fitSize('Daily Raid',w-50,20)),col:C.wool,sw:3.5});
+  const sub=done?'Done ✓'+(save.daily.streak>1?'  ·  '+save.daily.streak+' days in a row':''):'+1 chest today';
+  txt(sub,x+42,y+h-8+o,{font:hand(fitSize(sub,w-50,14)),col:done?C.gold:'#fff1c4',stroke:null});
+  if(!done){ctx.beginPath();ctx.arc(x+w-3,y+3,7+Math.sin(time*6),0,7);inkIt(C.blood,2);}
+  buttons.push(b);
+}
+/* ---- The Sheep Book: a card for every critter and boss you meet ---- */
+const BOOK_SLOTS=['chicken','hen','rooster','farmer','bird','fboss'];
+if(!save.book||typeof save.book!=='object')save.book={};
+if(!save.bookDone||typeof save.bookDone!=='object')save.bookDone={};
+let bookPage=0,bookT=0;
+function bookLines(T){return T.lines||DEFAULT_LINES;}
+function bookName(T,slot){
+  const L=bookLines(T);
+  if(slot==='bird')return ((L.bird||DEFAULT_LINES.bird).name)||'Mother Hen';
+  if(slot==='fboss')return ((L.boss||DEFAULT_LINES.boss).name)||'The Farmer Boss';
+  if(slot==='farmer')return capF(L.speaker||DEFAULT_LINES.speaker||'the farmer');
+  const k=T.enemy&&T.enemy[slot];return capF((k&&KIND_NAME[k])||DEF_NAME[slot]||slot);
+}
+function bookLine(T,slot){
+  const L=bookLines(T),n=bookName(T,slot);
+  if(slot==='bird')return n+': "'+((L.bird||DEFAULT_LINES.bird).intro)+'"';
+  if(slot==='fboss')return n+': "'+((L.boss||DEFAULT_LINES.boss).intro)+'"';
+  if(slot==='farmer')return n+': "'+((L.quips||DEFAULT_LINES.quips)[0])+'"';
+  const eg=(T.enemy&&T.enemy.egg&&KIND_NAME[T.enemy.egg])||'egg';
+  return slot==='chicken'?n+': jumps up when you least expect it.':slot==='hen'?n+': drops '+eg+'s. On purpose.':n+': always in a hurry. Watch for the !';
+}
+function bookMark(slot){
+  if(trialSkin)return;
+  const k=theme.id+':'+slot;if(save.book[k])return;save.book[k]=1;
+  toast('New Sheep Book card: '+bookName(theme,slot)+'!');
+  if(BOOK_SLOTS.every(s=>save.book[theme.id+':'+s])&&!save.bookDone[theme.id]){save.bookDone[theme.id]=1;save.chests++;toast(theme.worlds[0].name+' page complete!  +1 chest');sfx.best();}
+  persist();
+}
+function bookTick(dt){
+  bookT-=dt;if(bookT>0||!run)return;bookT=0.3;
+  for(const e of ents){if(e.dead)continue;const sx=e.wx-cam;if(sx<0||sx>W-16)continue;
+    if(e.type==='chicken'||e.type==='hen'||e.type==='farmer'||(e.type==='rooster'&&!e.chick&&e.state!=='pending'&&e.state!=='warn'))bookMark(e.type);}
+}
+function bookArt(sl,cx,by,s){
+  const e={type:sl,state:sl==='chicken'?'idle':'fly',ph:time*5,t:0,y:0,h:60,vy:0,vx:0,wx:0,eggs:1,drop:1,late:0};
+  ctx.save();
+  if(sl==='chicken'){ctx.translate(cx,by);ctx.scale(s,s);if(theme.enemy)drawThemeCritter(theme.enemy.chicken,e,0);else drawChicken(e,0);}
+  else if(sl==='hen'){ctx.translate(cx,by-30*s);ctx.scale(s,s);e.y=19;if(theme.enemy)drawThemeCritter(theme.enemy.hen,e,0);else drawChicken(e,0);}
+  else if(sl==='rooster'){ctx.translate(cx,by-30*s);ctx.scale(s,s);if(theme.enemy)drawThemeCritter(theme.enemy.rooster,e,0);else drawRooster(e,0);}
+  else if(sl==='farmer'){const g0=G;ctx.translate(cx,by);ctx.scale(s*0.55,s*0.55);G=-1;try{drawFarmer({state:'idle',ph:time*4,t:0},0);}finally{G=g0;}}
+  else if(sl==='bird'){ctx.translate(cx,by-26*s);ctx.scale(s*0.62,s*0.62);ctx.translate(0,19);drawBossBird(theme.bossBird||'hen',{state:'enter',ph:time*8,hp:3,t:0,y:0,tired:0});}
+  else{const g0=G;ctx.translate(cx+8*s,by);ctx.scale(s*0.3,s*0.3);G=0;try{drawFBoss({state:'enter',t:1,n:3,ph:time*6,hp:3,wheel:time*3,lift:0,stalls:0},0);}finally{G=g0;}}
+  ctx.restore();
+}
+function drawBookCard(T,sl,x,y,w,h){
+  const got=!!save.book[T.id+':'+sl],boss=sl==='bird'||sl==='fboss';
+  wobRect(x,y,w,h,BOOK_SLOTS.indexOf(sl)+70,1);inkIt(got?'rgba(46,34,72,0.95)':'rgba(24,16,40,0.9)',2.2,got?(boss?C.gold:'rgba(245,233,218,0.7)'):'rgba(245,233,218,0.3)');
+  ctx.save();wobRect(x+3,y+3,w-6,h-28,BOOK_SLOTS.indexOf(sl)+70,0.5);ctx.clip();
+  if(got)withTheme(T,()=>bookArt(sl,x+w/2,y+h-34,Math.min(w,h-28)/72));
+  else txt('?',x+w/2,y+(h-28)/2+18,{font:disp(Math.round(Math.min(48,h*0.36))),col:'rgba(245,233,218,0.35)',align:'center',stroke:null});
+  ctx.restore();
+  if(boss){wobRect(x+5,y+5,40,18,BOOK_SLOTS.indexOf(sl)+80,0.6);inkIt('rgba(60,30,10,0.9)',1.4,C.gold);txt('BOSS',x+25,y+19,{font:hand(13),col:C.gold,align:'center',stroke:null});}
+  const nm=got?bookName(T,sl):'???';
+  txt(nm,x+w/2,y+h-9,{font:hand(fitSize(nm,w-10,16)),col:got?C.wool:C.dim,align:'center',sw:3});
+  buttons.push({x,y,w,h,act:()=>{sfx.click();castleSay(got?bookLine(T,sl):(boss?'Beat the boss in ':'Meet it in ')+T.worlds[0].name+' to unlock this card.');}});
+}
+function bookPageBtn(x,y,w,h,dir,pages){
+  const on=dir<0?bookPage>0:bookPage<pages-1;wobRect(x,y,w,h,dir+60,1);inkIt('rgba(30,21,48,0.9)',2,on?C.wool:'rgba(245,233,218,0.25)');
+  ctx.strokeStyle=on?C.wool:'rgba(245,233,218,0.3)';ctx.lineWidth=3;ctx.beginPath();ctx.moveTo(x+w/2-dir*4,y+h/2-8);ctx.lineTo(x+w/2+dir*5,y+h/2);ctx.lineTo(x+w/2-dir*4,y+h/2+8);ctx.stroke();
+  if(on)buttons.push({x,y,w,h,act:()=>{bookPage+=dir;sfx.click();}});
+}
+function drawBookTab(R){
+  const ws=BOOK_WORLDS(),pages=ws.length;bookPage=clamp(bookPage,0,pages-1);const wid=ws[bookPage],T=THEMES[wid];
+  const found=BOOK_SLOTS.filter(s=>save.book[wid+':'+s]).length,doneP=!!save.bookDone[wid];
+  const head=T.worlds[0].name+'   ·   '+found+' / 6'+(doneP?'   ·   page complete!':'   ·   finish the page for a chest');
+  txt(head,R.x+R.w/2,R.y+17,{font:hand(fitSize(head,R.w-16,18)),col:doneP?C.gold:C.wool,align:'center',sw:4});
+  const pagerH=36,gy=R.y+28,gridH=R.h-pagerH-36,gap=8,cw=(R.w-gap*2)/3,ch=(gridH-gap)/2;
+  BOOK_SLOTS.forEach((sl,i)=>drawBookCard(T,sl,R.x+(i%3)*(cw+gap),gy+Math.floor(i/3)*(ch+gap),cw,ch));
+  const py=R.y+R.h-pagerH,tot=ws.reduce((a,w)=>a+BOOK_SLOTS.filter(s=>save.book[w+':'+s]).length,0),line='Page '+(bookPage+1)+' / '+pages+'   ·   '+tot+' / '+pages*6+' cards';
+  txt(line,R.x+R.w/2,py+24,{font:hand(fitSize(line,R.w-120,17)),col:C.dim,align:'center',stroke:null});
+  bookPageBtn(R.x,py,52,pagerH,-1,pages);bookPageBtn(R.x+R.w-52,py,52,pagerH,1,pages);
+}
+
+function genSection(){if(run&&run.daily&&run.daily.rng){const R=Math.random;Math.random=run.daily.rng;try{genSection0();}finally{Math.random=R;}}else genSection0();}
+
+
+/* ================= Hearts v2: start with 1, catch more (max 3) ================= */
+const HEART_CAP=3;
+const startHearts=()=>(run&&run.tut)||save.relaxed?3:(up('garden')>=1?2:1);
+const heartChance=()=>up('garden')>=2?0.3:0.17;
+function gainHeart(x,y,n){
+  n=n||1;
+  if(run.hearts<HEART_CAP){run.hearts=Math.min(HEART_CAP,run.hearts+n);run.heartGain=0.6;popText(x,y-30,n>1?'+'+n+' HEARTS':'+1 HEART','#ff4d6d',24);sfx.power();ring(x,y,'#ff4d6d',18,.5);}
+  else{run.blood+=5;popText(x,y-30,'+5 '+theme.item.short,'#ff4d6d',20);sfx.drop(3);}
+}
+function drawHeartUp(e,sx){
+  const y=e.y+Math.sin(e.ph*3)*5,p=1+0.08*Math.sin(time*8);
+  const g=ctx.createRadialGradient(sx,y,6,sx,y,32);g.addColorStop(0,'rgba(255,77,109,0.5)');g.addColorStop(1,'rgba(0,0,0,0)');ctx.fillStyle=g;ctx.beginPath();ctx.arc(sx,y,32,0,7);ctx.fill();
+  drawLifeHeart(sx,y+1,15*p,true);
+  ctx.strokeStyle='#ff4d6d';ctx.lineWidth=2;ctx.globalAlpha=0.6+0.4*Math.sin(time*6);wobCircle(sx,y,23,e.ph,1.2);ctx.stroke();ctx.globalAlpha=1;
+}
+
 const cv=document.getElementById('game');
 const ctx=cv.getContext('2d');
 let W=360,H=640,S=1,DPR=1,G=574,PX=94;
@@ -2997,8 +3255,8 @@ function unlockAudio(){
   try{
     AC=new Ctor();
     master=AC.createGain();master.gain.value=save.muted?0:1;master.connect(AC.destination);
-    sfxBus=AC.createGain();sfxBus.gain.value=0.55;sfxBus.connect(master);
-    musBus=AC.createGain();musBus.gain.value=0.22;musBus.connect(master);
+    sfxBus=AC.createGain();sfxBus.gain.value=0.55*save.vol.sfx;sfxBus.connect(master);
+    musBus=AC.createGain();musBus.gain.value=0.22*save.vol.mus;musBus.connect(master);
     noiseBuf=AC.createBuffer(1,AC.sampleRate,AC.sampleRate);
     const ch=noiseBuf.getChannelData(0);for(let i=0;i<ch.length;i++)ch[i]=Math.random()*2-1;
     startMusic();
@@ -3132,7 +3390,7 @@ const WORLD_TRACK=['farm','forest','graveyard','mountains'];
 let curTrack='menu';
 function bossActive(){return ents.some(e=>(e.type==='boss'||e.type==='fboss')&&e.state!=='wait'&&e.state!=='defeated'&&e.state!=='giveup');}
 function wantedTrack(){
-  if(state==='menu'||state==='castle'||state==='over')return 'menu';
+  if(state==='menu'||state==='settings'||state==='castle'||state==='over')return 'menu';
   if(bossActive())return 'boss';
   return theme.track||WORLD_TRACK[worldIndexAt(cam)%4];
 }
@@ -3185,7 +3443,7 @@ const PT=()=>64,PB=()=>G-44;
 const cliffTop=()=>G-150;
 const difficulty=x=>clamp(x/CONFIG.rampDist,0,1);
 const worldIndexAt=x=>mode==='story'&&curLevel?curLevel.wi:Math.floor(Math.max(0,x)/CONFIG.worldLen);
-const score=()=>run?Math.floor((cam/10+run.blood*5+run.sheep*25+run.bonks*10)*(up('throne')>=3?1.25:1)):0;
+const score=()=>run?Math.floor((cam/10+run.blood*5+run.sheep*25+run.bonks*10)*(1+0.1*up('throne'))):0;
 
 function resetWorld(){
   fadeIn=1;timeScale=1;
@@ -3217,7 +3475,7 @@ function pickPower(){if(cam>CONFIG.vampireFrom&&Math.random()<0.14)return 'vampi
 const addPower=(wx,y,kind)=>addEnt({type:'power',wx,y,kind:kind||pickPower(),ph:0});
 const addSheep=wx=>addEnt({type:'sheep',wx,y:G,ph:Math.random()*6,state:'graze',t:0,alert:false});
 
-function genSection(){
+function genSection0(){
   if(run&&run.tut&&gen.count<5){const len=genTut(gen.x,gen.count);gen.x+=len;gen.count++;gen.last='free';return;}
   const x0=gen.x,d=difficulty(x0),c=gen.count;
   let type,len;
@@ -3228,9 +3486,9 @@ function genSection(){
     gen.paused=true;gen.last='boss';return;
   }
   if(c===0)type='intro';
-  else if(c===1)type='obstacles';
-  else if(c===2)type='free';
-  else if(c===3)type='enemies';
+  else if(c===1)type='enemies';
+  else if(c===2)type='obstacles';
+  else if(c===3)type='free';
   else{
     const wf=lerp(.58,.45,d),wo=lerp(.27,.33,d),r=Math.random();
     type=r<wf?'free':r<wf+wo?'obstacles':'enemies';
@@ -3238,8 +3496,8 @@ function genSection(){
   }
   if(type==='intro')len=genFree(x0,900,true);
   else if(type==='free')len=genFree(x0,randi(700,1050),false);
-  else if(type==='obstacles')len=genObstacles(x0,d,c===1?2:randi(3,4),c===1);
-  else len=genEnemies(x0,d,c===3);
+  else if(type==='obstacles')len=genObstacles(x0,d,c===2?2:randi(3,4),c===2);
+  else len=genEnemies(x0,d,c===1);
   stats[type]+=len;gen.x+=len;gen.count++;gen.last=type;
 }
 function genFree(x0,len,intro){
@@ -3266,8 +3524,9 @@ function genFree(x0,len,intro){
     const force=gen.count===2||gen.sinceP>=2;
     if(force||Math.random()<powerChance()){addPower(x0+len*rand(.3,.7),rand(PT()+50,PB()-150),gen.count===2?'shield':undefined);gen.sinceP=0;}
     else gen.sinceP++;
+    if((run.hearts==null||run.hearts<HEART_CAP)&&gen.count>=3&&Math.random()<heartChance())addEnt({type:'heartup',wx:x0+len*rand(.4,.85),y:rand(PT()+60,PB()-140),ph:0});
     const firstChest=save.stats.chestsFound===0&&run.chests===0&&!gen.chestGiven&&gen.count>=5;
-    if(mode!=='story'&&gen.count>=4&&(firstChest||Math.random()<CONFIG.chestChance)){addEnt({type:'chest',wx:x0+len*rand(.35,.75),y:rand(PT()+60,PB()-130),ph:0});gen.chestGiven=true;}
+    if(mode!=='story'&&gen.count>=4&&(firstChest||Math.random()<CONFIG.chestChance*(hasPerk('pirate')?2:1))){addEnt({type:'chest',wx:x0+len*rand(.35,.75),y:rand(PT()+60,PB()-130),ph:0});gen.chestGiven=true;}
   }
   return len;
 }
@@ -3280,7 +3539,7 @@ function makeStake(wx,gy,gap,kind){
   addEnt({type:'stake',kind,wx,w,gy,gap,top,bot,rects,seed:Math.random()*100,passed:false,hitFx:false});
 }
 function genObstacles(x0,d,n,tutorial){
-  const gap=lerp(CONFIG.gapStart,CONFIG.gapMin,d)+(tutorial?30:0);
+  const gap=lerp(CONFIG.gapStart,CONFIG.gapMin,d)+(tutorial?30:0)+(save.relaxed?40:0);
   const spacing=lerp(300,250,d);
   const lo=50+gap/2,hi=G-36-gap/2;
   let gy=gen.gapY==null?(lo+hi)/2:clamp(gen.gapY,lo,hi);
@@ -3288,7 +3547,7 @@ function genObstacles(x0,d,n,tutorial){
     const shift=tutorial?70:lerp(110,185,d);
     gy=clamp(gy+rand(-shift,shift),lo,hi);
     const r=Math.random();
-    const kind=d>0.12&&r<0.16?'tower':d>0.12&&r<0.30?'branch':'pair';
+    const kind=tutorial?'pair':r<0.22?'tower':r<0.4?'branch':'pair';
     const wx=x0+170+i*spacing;
     makeStake(wx,gy,gap,kind);
     addDrop(wx+(kind==='tower'?27:22),gy);
@@ -3346,18 +3605,19 @@ function spawnDecor(){
 /* ================= Actions ================= */
 function startRun(){
   unlockAudio();
-  state='ready';stateT=0;run.skin=activeSkin();run.tut=mode==='endless'&&!save.tutDone&&!trialSkin;
+  state='ready';stateT=0;run.skin=activeSkin();run.tut=!!run.tut||(mode==='endless'&&!save.tutDone&&!trialSkin);
   P.vy=0;P.expr='happy';P.exprT=0;
-  run.revives=up('throne')>=1?1:0;
-  if(up('throne')>=2)P.screamN=Math.floor(screamCost()/2);
+  run.revives=0;run.maxHearts=HEART_CAP;run.hearts=startHearts();run.heartFx=0;run.perkUsed=0;run.discoT=0;
+  if(hasPerk('pghost'))P.pw.shield=Math.max(P.pw.shield,4);
+  P.screamN=run.tut?0:screamCost();
   if(up('library')>=3)P.pw.shield=4;
   const se=season();
   for(const sk of SKINS)if(sk.how==='season'&&sk.season===se&&unlockSkin(sk.id)){run.unlocked.push(sk.name);if(save.runs>=3)toast(sk.name+' Sheepula unlocked! (event)');}
   if(theme.id!=='night'&&!save.stats['tip_'+theme.id]){tipOnce('tip_'+theme.id,'Welcome to '+TW()[0].name+'! Grab the '+theme.item.many+'!');}
-  else if(trialSkin){const sk=SKINS.find(x=>x.id===trialSkin);toast('Trying '+(sk?sk.name:'')+' Sheepula for one run');}
+  else if(trialSkin){const sk=SKINS.find(x=>x.id===trialSkin);toast('Trial run with '+(sk?sk.name:'')+' Sheepula. Loot is not kept!');}
   missionsStart();
 }
-function restart(){if(mode==='story'&&curLevel){startLevel(curLevel);return;}resetWorld();state='menu';startRun();}
+function restart(){if(run&&run.daily){startDaily();return;}if(mode==='story'&&curLevel){startLevel(curLevel);return;}resetWorld();state='menu';startRun();}
 function tryRun(id){trialSkin=id;restart();}
 function toast(m){if(run){run.toastMsg=m;run.toastT=3;}}
 function goMenu(){mode='endless';curLevel=null;trialSkin=null;resetWorld();state='menu';stateT=0;sfx.click();}
@@ -3375,6 +3635,7 @@ function addScream(n){
 }
 function collectDrop(e){
   run.blood++;
+  if(hasPerk('rainbow')){run.rbc=(run.rbc||0)+1;if(run.rbc%10===0){run.blood++;popText(e.wx,e.y-22,'x2!','#ff7ad9',20);}}
   run.combo=(time-run.lastDrop<0.6)?run.combo+1:0;run.lastDrop=time;
   run.lastEat=cam;mEv('berry');mEv('combo',run.combo+1,1);
   sfx.drop(run.combo);burst(e.wx,e.y,6,theme.item.color,120);
@@ -3383,6 +3644,7 @@ function collectDrop(e){
   if(P.exprT<=0||P.expr==='normal'){P.expr='happy';P.exprT=0.25;}
 }
 function applyPower(kind,wx,y){
+  if(hasPerk('golden')){run.blood+=5;popText(wx,y-34,'+5 GOLD','#ffd23f',18);}
   P.pw[kind]=pwDur(kind);sfx.power();mEv('power');mEv('power_'+kind);ring(wx,y,kind==='shield'?C.shield:C.blood,18,.5);
   popText(kind==='vampire'?cam+Math.max(PX+10,W/2):cam+PX+10,kind==='vampire'?Math.max(P.y-60,PT()+40):P.y-36,{magnet:theme.item.magnet,boost:'BAT BOOST!',shield:'NIGHT SHIELD!',vampire:'VAMPIRE MODE!'}[kind],kind==='shield'?C.shield:C.blood,kind==='vampire'?30:24);
   if(kind==='boost'){P.expr='angry';P.exprT=pwDur('boost');}
@@ -3392,6 +3654,8 @@ function stealSheep(e){
   e.state='taken';e.t=0;e.wx0=e.wx;e.y0=e.y;
   run.sheep++;addScream(3);mEv('sheep');
   const bonus=2*up('pen');if(bonus){run.blood+=bonus;popText(e.wx+26,G-98,'+'+bonus+' '+theme.item.short,theme.item.color,18);}
+  if(hasPerk('king')){run.blood+=3;popText(e.wx+34,G-124,'+3 ROYAL TAX','#ffd23f',17);}
+  if(hasPerk('santa')){for(let k=0;k<5;k++)addDrop(cam+PX+170+k*44,clamp(P.y-30+Math.sin(k*1.3)*36,PT()+20,PB()-20));popText(cam+PX+60,P.y-70,'HO HO HO!','#ff5a6a',22);}
   sfx.baa();popText(e.wx,G-50,pickL('stolen'),C.wool,24);popText(e.wx+20,G-74,'+25',C.warn,20);
   P.expr='happy';P.exprT=0.6;puff(e.wx,G-14,6);
 }
@@ -3409,12 +3673,14 @@ function doScream(){
   if(state!=='playing'||P.dead)return;
   const cost=screamCost();
   if(P.screamN<cost){run.screamNudge=0.4;run.screamMsg=(cost-P.screamN)+' more '+theme.item.short+' to charge';run.screamMsgT=1.6;sfx.click();return;}
-  P.screamN=0;P.expr='angry';P.exprT=0.9;shake=11;sfx.scream();P.grace=Math.max(P.grace,0.5);save.stats.screams++;run.tutScreamed=true;mEv('scream');
+  P.screamN=0;P.expr='angry';P.exprT=0.9;shake=hasPerk('trex')?22:11;sfx.scream();if(hasPerk('disco'))run.discoT=4;P.grace=Math.max(P.grace,0.5);save.stats.screams++;run.tutScreamed=true;mEv('scream');
   ring(cam+PX,P.y,C.blood,20,.7);ring(cam+PX,P.y,'#ffffff',10,.5);
-  popText(cam+PX+20,P.y-44,'MWAHAHA!',C.blood,30);
+  popText(cam+PX+20,P.y-44,hasPerk('trex')?'ROOOAAAR!':hasPerk('disco')?'DANCE FLOOR!':'MWAHAHA!',hasPerk('disco')?'#ff7ad9':C.blood,30);
+  if(hasPerk('devil'))ring(cam+PX,P.y,'#ff8a3d',36,.8);
   let n=0;
   for(const e of ents){
-    const sx=e.wx-cam;if(sx<-80||sx>W+340)continue;
+    const sx=e.wx-cam;if(sx<-80||sx>W+(hasPerk('devil')?800:340))continue;
+    if(hasPerk('trex')&&(e.type==='hen'||(e.type==='rooster'&&e.state!=='pending'&&e.state!=='warn'))&&e.state!=='flee'&&!e.dead){e.dead=true;burst(e.wx,e.y||PT()+80,14,'#ffffff',220);addDrop(e.wx,clamp(e.y||PT()+80,PT()+20,PB()-20));popText(e.wx,(e.y||PT()+80)-24,'KO!',C.warn,22);n++;continue;}
     if(e.type==='fboss'){if(['enter','forks','bales','rev','charge','back','stall'].includes(e.state)){fbossHit(e,true);n++;}continue;}
     if(e.type==='bale'){e.dead=true;burst(e.wx,e.y,8,'#e8d08a',140);continue;}
     if(e.type==='hunter'&&e.state!=='flee'){e.state='flee';popText(e.wx,G-140,pickL('eek'),C.wool,22);n++;continue;}
@@ -3428,16 +3694,27 @@ function doScream(){
     else if(e.type==='fork'||e.type==='egg'){e.dead=true;burst(e.wx,e.y,8,'#fff',140);}
   }
   if(n){run.bonks+=n;popText(cam+PX+20,P.y-74,'+'+n*10,C.warn,22);mEv('bonk',n);mEv('scream_hit',n,1);}
+  if(hasPerk('alien')){const sh=ents.filter(e=>e.type==='sheep'&&!e.bait&&!e.dead&&e.state!=='taken'&&e.wx-cam>-40&&e.wx-cam<W+260).sort((a,b)=>a.wx-b.wx)[0];
+    if(sh){stealSheep(sh);ring(sh.wx,G-40,'#7cff9a',22,.7);popText(sh.wx,G-120,'BEAMED UP!','#7cff9a',22);}}
 }
 function die(cause,killer){
-  if(godMode)return;
+  if(godMode||P.dead||P.grace>0)return;
   run.killer=killer||cause;
   mEv('ouch_'+(cause||'other'));
-  if(run.revives>0){
-    run.revives--;P.pw.shield=2.5;P.vy=-480;if(P.y>G-60)P.y=G-60;
-    shake=10;flash=0.35;flashCol=C.gold;sfx.power();puff(cam+PX,P.y,6);
-    popText(cam+PX,P.y-40,'SECOND BITE!',C.gold,28);return;
+  if(!run.perkUsed){
+    if(hasPerk('zombie')){run.perkUsed=1;perkSave("I'M FINE! (Already Dead)");return;}
+    if(hasPerk('ski')&&cause==='ground'){run.perkUsed=1;perkSave('SNOW BRAKES!');return;}
+    if(hasPerk('ghost')&&cause==='stake'){run.perkUsed=1;P.grace=Math.max(P.grace,0.9);sfx.whoosh();popText(cam+PX,P.y-44,'BOO-THROUGH!','#cfe8ff',24);return;}
   }
+  if(run.hearts>1){
+    run.hearts--;run.heartFx=0.7;run.hits=(run.hits||0)+1;
+    P.grace=Math.max(P.grace,hasPerk('ninja')?2.6:1.6);P.vy=-440;if(P.y>G-60)P.y=G-60;P.expr='dizzy';P.exprT=0.7;
+    shake=10;flash=0.3;flashCol='#ff2a4a';sfx.hit();puff(cam+PX,P.y,7);burst(cam+PX,P.y,10,'#f5e9da',170);
+    popText(cam+PX,P.y-40,pickL('ouch'),C.warn,26);
+    if(run.hearts===1)popText(cam+PX,P.y-72,'LAST HEART! Catch a new one!',C.blood,22);
+    return;
+  }
+  run.hearts=0;
   P.dead=true;state='dying';stateT=0;
   P.vy=-360;P.spin=(Math.random()<.5?-1:1)*9;P.expr='dizzy';P.exprT=99;
   shake=16;flash=0.5;flashCol='#ff2a4a';
@@ -3448,24 +3725,31 @@ function gameOver(){
   if(mode==='story'&&curLevel){storyFinish(false);return;}
   if(run.tut){save.tutTries=(save.tutTries||0)+1;if(save.tutTries>=3)save.tutDone=1;}
   mEv('run');
+  if(!run.daily){if(run.t<12)save.quickDeaths=(save.quickDeaths||0)+1;else save.quickDeaths=0;
+    if(save.quickDeaths>=3&&!save.relaxed&&!save.relaxOffered){run.offerRelax=true;save.relaxOffered=1;}}
   state='over';stateT=0;
   run.finalScore=score();
-  if(mode==='endless')save.stats.lastMeters=cam/10;
-  run.newBest=run.finalScore>save.best&&run.finalScore>0;
+  const trial=!!trialSkin;run.trial=trial;
+  if(mode==='endless'&&!trial)save.stats.lastMeters=cam/10;
+  run.newBest=!trial&&run.finalScore>save.best&&run.finalScore>0;
   if(run.newBest)save.best=run.finalScore;
-  save.blood+=run.blood;save.sheep+=run.sheep;save.runs++;
-  save.stats.meters+=cam/10;save.stats.bestBlood=Math.max(save.stats.bestBlood,run.blood);save.stats.bestMeters=Math.max(save.stats.bestMeters,cam/10);
+  if(!trial&&hasPerk('business')&&run.blood>0){run.interest=Math.ceil(run.blood*0.1);run.blood+=run.interest;}
+  if(!trial){save.blood+=run.blood;save.sheep+=run.sheep;}save.runs++;
+  if(!trial){save.stats.meters+=cam/10;save.stats.bestBlood=Math.max(save.stats.bestBlood,run.blood);save.stats.bestMeters=Math.max(save.stats.bestMeters,cam/10);}
   run.trialName=trialSkin?(SKINS.find(x=>x.id===trialSkin)||{}).name:null;trialSkin=null;
-  save.chests+=run.chests;save.stats.chestsFound+=run.chests;
+  if(!trial){save.chests+=run.chests;save.stats.chestsFound+=run.chests;}
   persist();
   run.unlocked.push(...checkUnlocks());
   missionsEnd();
   run.quip=pickL('quips');run.speaker=TL('speaker');
+  if(run.daily){const d=run.daily;run.quip=d.done?(run.dailyWon?'Daily Raid complete! Your chest is waiting in the castle.':'Already done today. Come back tomorrow!'):'Daily Raid: '+Math.min(d.p,d.n)+' / '+d.n+'. So close, try again!';run.speaker='Daily Raid  ·  '+d.txt;}
+  if(trial){run.quip='You grabbed '+run.blood+' '+theme.item.many+' and '+run.sheep+' sheep, but trial loot is not kept.';run.speaker='Trial run';}
   run.newBest?sfx.best():sfx.over();
 }
 
 /* ================= Update ================= */
 function throwFork(f,fast){
+  if(hasPerk('farmhand')&&!fast&&Math.random()<0.3){popText(f.wx,G-150,pick(['Hi cousin!','Oops, butterfingers!','Not today, cuz!']),C.wool,20);return;}
   const hx=f.wx-16,hy=G-118;
   const ty=fast?f.aimY:clamp(P.y,PT(),PB());
   const close=fast?CONFIG.fastFork:230,dist=(hx-cam)-PX,tt=Math.max(fast?0.18:0.45,dist/close);
@@ -3510,7 +3794,7 @@ function bossHit(b,byScream){
   if(b.hp<=0)bossDefeated(b);else{b.state='hurt';b.t=0;}
 }
 function bossDefeated(b){
-  b.state='defeated';b.t=0;run.chests++;run.blood+=30;run.bonks+=10;save.stats.bosses++;mEv('boss');
+  b.state='defeated';b.t=0;bookMark('bird');gainHeart(cam+PX,P.y-30,up('garden')>=3?2:1);run.chests++;run.blood+=30;run.bonks+=10;save.stats.bosses++;mEv('boss');
   banner={text:TB('bird','name')+' defeated!',sub:'+1 rare chest  ·  +30 '+theme.item.short,t:0};sfx.best();
   popText(b.wx,b.y-110,TB('bird','defeat'),C.wool,22);
   if(mode==='story')addEnt({type:'lamb',wx:b.wx,y:b.y-20,i:2,ph:0,t:0,home:1});
@@ -3542,7 +3826,7 @@ function fbossHit(b,byScream){
   if(b.hp<=0)fbossDefeated(b);else{b.state='hurt';b.t=0;}
 }
 function fbossDefeated(b){
-  b.state='defeated';b.t=0;run.chests++;run.blood+=40;run.bonks+=10;save.stats.bosses++;mEv('boss');
+  b.state='defeated';b.t=0;bookMark('fboss');gainHeart(cam+PX,P.y-30,up('garden')>=3?2:1);run.chests++;run.blood+=40;run.bonks+=10;save.stats.bosses++;mEv('boss');
   banner={text:TB('boss','name')+' defeated!',sub:'+1 rare chest  ·  +40 '+theme.item.short,t:0};sfx.best();
   popText(b.wx+30,G-210,TB('boss','defeat'),C.wool,22);
   if(unlockSkin('farmhand')){run.unlocked.push('Farmhand');toast('Farmhand Sheepula unlocked!');}
@@ -3607,7 +3891,7 @@ function updateBoss(b,dt){
       break;
     case 'chicks':b.t-=dt;b.sx=damp(b.sx,W*0.8,3,dt);if(b.t<=0){b.state='leave';b.t=0;}break;
     case 'leave':b.sx+=380*dt;b.y-=60*dt;if(b.sx>W+120){b.state='tired';b.tired++;b.sx=W+70;b.y=rand(PT()+140,PB()-140);}break;
-    case 'tired':b.sx-=170*dt;b.y+=Math.sin(b.ph*0.25)*20*dt;if(b.sx<-120){b.state='enter';b.t=0;b.sx=W+120;b.y=PT()+110;}break;
+    case 'tired':b.sx-=(hasPerk('count')?105:170)*dt;b.y+=Math.sin(b.ph*0.25)*20*dt;if(b.sx<-120){b.state='enter';b.t=0;b.sx=W+120;b.y=PT()+110;}break;
     case 'hurt':b.t+=dt;b.sx+=420*dt;b.y-=200*dt;if(b.t>0.9){b.state='enter';b.t=0;b.sx=W+120;b.y=PT()+110;}break;
     case 'defeated':b.t+=dt;b.sx+=200*dt;b.y-=160*dt;if(b.t>2.2){b.dead=true;endBoss();}break;
     case 'giveup':b.t+=dt;b.sx+=300*dt;b.y-=120*dt;if(b.t>1.6){b.dead=true;endBoss();}break;
@@ -3620,10 +3904,11 @@ function updateEnt(e,dt){
       e.ph+=dt*4;
       if((P.pw.magnet>0||P.pw.vampire>0)&&!P.dead){
         const dx=(cam+PX)-e.wx,dy=P.y-e.y,dd=Math.hypot(dx,dy);
-        if(dd<200&&dd>0.01){const s=Math.min(dd,(520+speed)*dt);e.wx+=dx/dd*s;e.y+=dy/dd*s;}
+        if(dd<(hasPerk('cyber')&&P.pw.magnet>0?290:200)&&dd>0.01){const s=Math.min(dd,(520+speed)*dt);e.wx+=dx/dd*s;e.y+=dy/dd*s;}
       }
       break;
     case 'power':e.ph+=dt;break;
+    case 'heartup':e.ph+=dt;break;
     case 'sheep':
       e.ph+=dt*3;
       if(e.state==='graze'){const dx=e.wx-(cam+PX);e.alert=dx<260&&dx>-40;}
@@ -3760,6 +4045,7 @@ function collide(){
     switch(e.type){
       case 'drop':if(hit(pwx,py,R+2,e.wx,e.y,12)){e.dead=true;collectDrop(e);}break;
       case 'power':if(hit(pwx,py,R+2,e.wx,e.y,18)){e.dead=true;applyPower(e.kind,e.wx,e.y);}break;
+      case 'heartup':if(hit(pwx,py,R+2,e.wx,e.y,18)){e.dead=true;gainHeart(e.wx,e.y,1);}break;
       case 'sheep':{const rx=60+30*up('pen'),ry=150+30*up('pen');if(e.state==='graze'&&Math.abs(e.wx-pwx)<rx&&py>G-16-ry)stealSheep(e);}break;
       case 'stake':
         for(const r of e.rects){
@@ -3822,6 +4108,7 @@ function updatePlayer(dt){
     if(P.pw[k]>0){P.pw[k]-=dt;if(P.pw[k]<=0){P.pw[k]=0;if(k!=='magnet')P.grace=Math.max(P.grace,CONFIG.grace);}}
   }
   if(P.grace>0)P.grace-=dt;
+  if(run&&run.heartFx>0)run.heartFx-=dt;
   if(run.screamHintT>0)run.screamHintT-=dt;
   if(run.screamMsgT>0)run.screamMsgT-=dt;
   if(run.toastT>0)run.toastT-=dt;
@@ -3873,14 +4160,15 @@ function updateFx(dt){
 function update(dt){
   fadeIn=Math.max(0,fadeIn-dt*3.2);
   if(run&&run.spot){run.spot.rt+=dt;if(run.spot.rt>4)run.spot=null;}
-  if(state==='playing'&&run&&(run.tut||run.spot)){timeScale=damp(timeScale,((run.tut&&tutSlow())||spotSlow())?0.32:1,7,dt);dt*=timeScale;}else timeScale=1;
+  {const nap=state==='playing'&&run&&!run.tut&&hasPerk('sleepy')&&run.t<6;
+  if(state==='playing'&&run&&(run.tut||run.spot||nap)){timeScale=damp(timeScale,((run.tut&&tutSlow())||spotSlow())?0.32:nap?lerp(0.55,1,smooth(clamp(run.t/6,0,1))):1,7,dt);dt*=timeScale;}else timeScale=1;}
   time+=dt;stateT+=dt;boil=Math.floor(time*7);
   shake=Math.max(0,shake-dt*40);flash=Math.max(0,flash-dt*2);
   if(state==='paused')return;
   if(state==='resuming'){resumeT-=dt;if(resumeT<=0){state='playing';}return;}
   updateBats(dt);
   if(state==='ready'){readyTick(dt);updateFx(dt);return;}
-  if(state==='menu'||state==='missions'||state==='story'||state==='cutscene'){menuIdle(dt);updateFx(dt);return;}
+  if(state==='menu'||state==='settings'||state==='missions'||state==='story'||state==='cutscene'){menuIdle(dt);updateFx(dt);return;}
   if(state==='castle'){
     menuIdle(dt);updateFx(dt);stageT+=dt;castleMsgT=Math.max(0,castleMsgT-dt);castleShakeT=Math.max(0,castleShakeT-dt);
     if(chestAnim){const pr=chestAnim.t;chestAnim.t+=dt;if(pr<0.75&&chestAnim.t>=0.75){sfx.best();if(chestAnim.px!=null)for(let i=0;i<30;i++)addPart({kind:'spark',x:chestAnim.px,y:chestAnim.py,vx:rand(-170,170),vy:rand(-240,-40),life:rand(.5,1),size:rand(2,4.5),color:[C.gold,'#fff1a8',C.blood][i%3],grav:260});}}
@@ -3890,7 +4178,7 @@ function update(dt){
   const d=mode==='story'&&curLevel?curLevel.d:difficulty(cam);
   if(state==='playing'){
     run.t+=dt;
-    const base=lerp(CONFIG.speedStart,CONFIG.speedMax,d);
+    const base=lerp(CONFIG.speedStart,CONFIG.speedMax,d)*(save.relaxed?0.85:1);
     speed=damp(speed,base*(P.pw.boost>0?1.85:1)*(P.pw.vampire>0?1.35:1),P.pw.boost>0||P.pw.vampire>0?5:3,dt);
   }else speed=damp(speed,0,2.2,dt);
   cam+=speed*dt;
@@ -3901,7 +4189,7 @@ function update(dt){
   spawnDecor();
   updatePlayer(dt);
   for(const e of ents)updateEnt(e,dt);
-  if(state==='playing'){collide();missionsTick();tutTick(dt);}
+  if(state==='playing'){collide();missionsTick();tutTick(dt);discoTick(dt);dailyTick();bookTick(dt);}
   finishingTick(dt);
   if(run&&run.mPops&&run.mPops.length){run.mPops[0].t+=dt;if(run.mPops[0].t>2.9)run.mPops.shift();}
   updateFx(dt);
@@ -6073,7 +6361,7 @@ function edgeWarnOld(y){
   ctx.beginPath();ctx.moveTo(x-20,y);ctx.lineTo(x-28,y-6);ctx.lineTo(x-28,y+6);ctx.closePath();inkIt(C.warn,1.6);
 }
 function drawEntities(){
-  const order=['marker','finish','stake','trap','sheep','bait','drop','power','chest','lamb','farmer','hunter','chicken','hen','rooster','boss','fboss','egg','fork','garlic','bale'];
+  const order=['marker','finish','stake','trap','sheep','bait','drop','power','heartup','chest','lamb','farmer','hunter','chicken','hen','rooster','boss','fboss','egg','fork','garlic','bale'];
   for(const type of order){
     for(const e of ents){
       if(e.type!==type||e.dead)continue;
@@ -6086,6 +6374,7 @@ function drawEntities(){
         case 'sheep':drawSheepNPC(e,sx);drawSheepArrow(e,sx);break;
         case 'drop':drawDrop(e,sx);break;
         case 'power':drawPower(e,sx);break;
+        case 'heartup':drawHeartUp(e,sx);break;
         case 'farmer':drawFarmer(e,sx);if(e.state==='wind'&&sx<W-20)exclaim(sx,G-128);if(e.state==='fastWind'&&sx<W-20){const b=Math.abs(Math.sin(time*16))*4;txt('!!',sx,G-134-b,{font:hand(36),col:C.blood,align:'center',sw:6});}break;
         case 'chicken':if(theme.enemy)drawThemeCritter(theme.enemy.chicken,e,sx);else drawChicken(e,sx);if(e.state==='warn'&&sx<W-20)exclaim(sx-10,e.y-56);break;
         case 'hen':if(theme.enemy)drawThemeCritter(theme.enemy.hen,e,sx);else drawChicken(e,sx);if(e.state==='lay')exclaim(sx+30,e.y-30);break;
@@ -6184,6 +6473,7 @@ function iconButton(x,y,s,icon,act,seed){
   wobRect(x,y,s,s,seed,1);inkIt('rgba(24,16,40,0.78)',2.4,'rgba(245,233,218,0.85)');
   const cx=x+s/2,cy=y+s/2;ctx.fillStyle=C.wool;ctx.strokeStyle=C.wool;ctx.lineCap='round';
   if(icon==='pause'){ctx.fillRect(cx-8,cy-9,5,18);ctx.fillRect(cx+3,cy-9,5,18);}
+  else if(icon==='gear'){ctx.lineWidth=2.6;ctx.beginPath();for(let i=0;i<16;i++){const a=i/16*Math.PI*2,r=i%2?7.5:10.5;ctx.lineTo(cx+Math.cos(a)*r,cy+Math.sin(a)*r);}ctx.closePath();ctx.fill();ctx.beginPath();ctx.arc(cx,cy,3.4,0,7);ctx.fillStyle='rgba(24,16,40,1)';ctx.fill();}
   else if(icon==='back'){ctx.lineWidth=3.4;ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(cx+9,cy);ctx.lineTo(cx-8,cy);ctx.moveTo(cx-1,cy-7);ctx.lineTo(cx-8,cy);ctx.lineTo(cx-1,cy+7);ctx.stroke();}
   else{
     ctx.beginPath();ctx.moveTo(cx-11,cy-4);ctx.lineTo(cx-6,cy-4);ctx.lineTo(cx,cy-10);ctx.lineTo(cx,cy+10);ctx.lineTo(cx-6,cy+4);ctx.lineTo(cx-11,cy+4);ctx.closePath();ctx.fill();
@@ -6197,10 +6487,11 @@ function iconButton(x,y,s,icon,act,seed){
 function drawHUD(){
   const m=16;
   txt('Score: '+score(),m,m+24,{font:hand(28)});
-  if(mode==='story'&&curLevel)txt('Level '+curLevel.code,m,m+48,{font:hand(19),col:C.dim,sw:4});else txt('Best: '+Math.max(save.best,0),m,m+48,{font:hand(19),col:C.dim,sw:4});
+  if(mode==='story'&&curLevel)txt('Level '+curLevel.code,m,m+48,{font:hand(19),col:C.dim,sw:4});else if(trialSkin)txt('Trial run · loot not kept',m,m+48,{font:hand(17),col:C.warn,sw:4});else txt('Best: '+Math.max(save.best,0),m,m+48,{font:hand(19),col:C.dim,sw:4});
   drawItemIcon(theme.item.kind,m+8,m+72,0.85);txt(String(run.blood),m+20,m+80,{font:hand(22),sw:4});
   const bw=ctx.measureText(String(run.blood)).width;
   drawSheepIcon(m+40+bw,m+71,0.8);txt(String(run.sheep),m+54+bw,m+80,{font:hand(22),sw:4});
+  {ctx.font=hand(22);const sw2=ctx.measureText(String(run.sheep)).width;drawHearts(m+54+bw+sw2+24,m+71);}
   const boss=ents.find(e=>(e.type==='boss'||e.type==='fboss')&&e.state!=='wait');
   if(boss){const by=W>=560?m+22:m+128,fb=boss.type==='fboss';txt(TB(fb?'boss':'bird','name'),W/2,by,{font:hand(19),col:C.wool,align:'center',sw:4});
     for(let i=0;i<3;i++){const ex=W/2-26+i*26;
@@ -6209,6 +6500,8 @@ function drawHUD(){
   const mpop=drawMissionPops(m,boss&&W<560);
   drawTip(m);
   if(state==='ready')drawReady();
+  if(run.tut&&!save.tutDone&&(state==='playing'||state==='ready'))button(m,H-m-38,130,38,'Skip tutorial',skipTut,false,131);
+  else if(run.daily&&state!=='ready')drawDailyPill(m,H-m-36);
   if(run.toastT>0){ctx.globalAlpha=Math.min(1,run.toastT*2);txt(run.toastMsg,W/2,m+(boss&&W<560?184:136)+(mpop?(boss&&W<560?56:64):0),{font:hand(fitSize(run.toastMsg,W-40,21)),col:C.gold,align:'center',sw:5});ctx.globalAlpha=1;}
   if(mode==='story')drawStoryHUD();
   iconButton(W-m-44,m,44,'pause',pause,2);
@@ -6427,6 +6720,8 @@ function drawMenu(){
    ctx.fillStyle='rgba(255,215,120,0.55)';ctx.fillRect(x0+w1,y+3,w2,1.2);
    siteLink={x:x0+w1-10,y:H-30,w:w2+20,h:30,_ui:1};buttons.push({x:siteLink.x,y:siteLink.y,w:siteLink.w,h:siteLink.h,act:()=>{}});}
   iconButton(W-60,16,44,save.muted?'muted':'sound',toggleMute,4);
+  iconButton(W-112,16,44,'gear',openSettings,5);
+  drawDailyButton(16,16,Math.min(170,W*0.42),50);
   const ML=TL('menu'),li=Math.floor(time/5)%ML.length,ph=time%5;
   if(ph>0.6&&ph<4.2&&P.expr!=='sleepy'){
     const tipX=uiW.px/uiK+40,line=ML[li];let bx=tipX-6;const fs=fitSize(line,W-bx-36,18);ctx.font=hand(fs);const tw=ctx.measureText(line).width;
@@ -6434,7 +6729,7 @@ function drawMenu(){
     // the bubble sits right above Sheepula's head. If that covers the Castle/Skins buttons, slide it left;
     // only on narrow phones, where there is no room, it drops below the buttons.
     let by=uiW.py/uiK-88;
-    if(hit(bx)){const alt=bxC-10-bw;if(alt>=8&&alt+bw>=tipX+12)bx=alt;else by=Math.max(by,byC+52);}
+    if(hit(bx)){const alt=bxC-10-bw;if(alt>=8&&alt+bw>=tipX-14)bx=alt;else by=Math.max(by,byC+52);}
     const tb=clamp(tipX+17,bx+16,bx+bw-16);
     wobRect(bx,by,bw,bh,li+1,1);inkIt('#fbf3e6',2.4);
     ctx.beginPath();ctx.moveTo(tb-7,by+bh-1);ctx.lineTo(tipX,by+bh+14);ctx.lineTo(tb+7,by+bh-1);ctx.closePath();inkIt('#fbf3e6',2.4);
@@ -6491,7 +6786,7 @@ function drawOver(){
   const k=smooth(Math.min(1,stateT/0.4));
   ctx.fillStyle=`rgba(10,5,20,${0.45*k})`;ctx.fillRect(0,0,W,H);
   const ms=run.mSnap||[],ul=run.unlocked.length||run.trialName,ru=run.rankUp!=null;
-  const extra=(ms.length?ms.length*26+12:0)+(ul?26:0)+(ru?54:0)+(deathInfo()?52:0);
+  const extra=(ms.length?ms.length*26+12:0)+(ul?26:0)+(ru?54:0)+(deathInfo()?52:0)+(run.offerRelax?52:0);
   const pw=Math.min(W-32,360),ph=330+extra,px=(W-pw)/2,py=clamp(H*0.46-ph/2,50,Math.max(50,H-ph-10))+(1-k)*40;
   ctx.globalAlpha=k;
   wobRect(px,py,pw,ph,12,1.6);inkIt('rgba(36,26,58,0.97)',3,C.wool);
@@ -6507,12 +6802,13 @@ function drawOver(){
     wobRect(-52,-17,104,34,3,1);inkIt(C.blood,2.4);txt('NEW BEST!',0,8,{font:hand(20),col:C.wool,align:'center',sw:3});ctx.restore();
   }else txt('Best '+save.best,W/2,py+216,{font:hand(18),col:C.dim,align:'center',stroke:null});
   const ry=py+250;ctx.font=hand(22);
-  const items=[['drop','+'+run.blood],['sheep','+'+run.sheep]];if(run.chests)items.push(['chest','+'+run.chests]);
+  const items=run.trial?[['drop','+0'],['sheep','+0']]:[['drop','+'+run.blood],['sheep','+'+run.sheep]];if(run.chests&&!run.trial)items.push(['chest','+'+run.chests]);if(run.interest)items[0][1]+=' (+'+run.interest+' interest)';
   const ws=items.map(it=>ctx.measureText(it[1]).width);let x=W/2-(ws.reduce((a,b)=>a+b,0)+items.length*24+(items.length-1)*24)/2;
   items.forEach((it,i)=>{if(it[0]==='drop')drawItemIcon(theme.item.kind,x+8,ry-7,0.85);else if(it[0]==='sheep')drawSheepIcon(x+10,ry-8,0.8);else drawChestIcon(x+10,ry-6,0.55,0);txt(it[1],x+24,ry,{font:hand(22),sw:4});x+=24+ws[i]+24;});
   let y=py+262;
   y=drawOverExtras(px,pw,y);
   y+=drawDeathTip(px+18,y+4,pw-36);
+  y+=drawRelaxOffer(px+18,y+4,pw-36);
   ctx.globalAlpha=1;
   if(stateT>0.5){
     const bw1=Math.round((pw-48)*0.6),bw2=pw-48-bw1-10;
@@ -6627,6 +6923,7 @@ function drawUpgradeIcon(id,x,y,s=1){
       ctx.strokeStyle='rgba(245,233,218,0.7)';ctx.lineWidth=1.2;ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(0,10);
       for(const yy of [-3,1,5]){ctx.moveTo(-10,yy);ctx.lineTo(-3,yy+1);ctx.moveTo(3,yy+1);ctx.lineTo(10,yy);}ctx.stroke();break;
     case 'throne':drawCrown(0,2,1.3);break;
+    case 'garden':drawLifeHeart(0,1,13,true);break;
   }
   ctx.restore();
 }
@@ -6751,6 +7048,8 @@ function drawStage(r){
   const name=sk.name+' Sheepula';
   txt(name,cx,ny,{font:disp(Math.round(clamp(fitSize(name,r.w-20,30)*1.0,18,30))),col:sk.rare?'#e3c8ff':C.wool,align:'center',sw:6});
   const info=skinInfo(sk)+(sk.world?'  ·  World: '+THEMES[sk.world].worlds[0].name:'');txt(info,cx,ny+21,{font:hand(fitSize(info,r.w-20,17)),col:on?C.gold:'#e6dcf2',align:'center',sw:3.5});
+  {const pk=PERKS[sk.id];if(pk){const bh2=r.h<240?36:40,y0=r.y+2+bh2+24,t1='PERK: '+pk.name,t2=perkDesc(pk),mw=r.w-136;
+    txt(t1,cx,y0,{font:hand(fitSize(t1,mw,19)),col:'#ffe08a',align:'center',sw:4});txt(t2,cx,y0+19,{font:hand(fitSize(t2,mw,15)),col:C.wool,align:'center',sw:3.5});}}
   if(sk.rare){wobRect(r.x+4,r.y+44,58,24,9,0.8);inkIt('rgba(60,30,90,0.95)',1.8,'#c58bff');txt('RARE',r.x+33,r.y+62,{font:hand(15),col:'#e3c8ff',align:'center',stroke:null});}
   // arrows to flip through skins
   const idx=SKINS.findIndex(x=>x.id===sk.id);
@@ -6797,12 +7096,12 @@ function drawCastleScreen(pal){
   let x=W/2-(18+wb+26+22+wc)/2;
   drawDropIcon(x+7,74,0.72);txt(b,x+18,81,{font:hand(20),sw:4});x+=18+wb+26;
   drawSheepIcon(x+9,73,0.7);txt(c,x+22,81,{font:hand(20),sw:4});
-  const T=L.tabs,tw=(T.w-16)/3;
-  [['upgrades','Upgrades'],['skins','Skins'],['chests',save.chests?'Chests ('+save.chests+')':'Chests']].forEach(([id,label],i)=>{
+  const T=L.tabs,tw=(T.w-24)/4;
+  [['upgrades','Upgrades'],['skins','Skins'],['chests',save.chests?'Chests ('+save.chests+')':'Chests'],['book','Book']].forEach(([id,label],i)=>{
     const tx=T.x+i*(tw+8),onT=castleTab===id;
     wobRect(tx,T.y,tw,T.h,40+i,1);inkIt(onT?C.blood:'rgba(30,21,48,0.92)',2.4,onT?C.ink:'rgba(245,233,218,0.6)');
     txt(label,tx+tw/2,T.y+T.h/2+7,{font:hand(fitSize(label,tw-10,21)),col:onT?C.wool:C.dim,align:'center',sw:4});
-    const dot=id==='upgrades'?UPGRADES.some(canBuy):id==='skins'?SKINS.some(sk=>sk.how==='blood'&&!owns(sk.id)&&save.blood>=sk.cost):save.chests>0;
+    const dot=id==='upgrades'?UPGRADES.some(canBuy):id==='skins'?SKINS.some(sk=>sk.how==='blood'&&!owns(sk.id)&&save.blood>=sk.cost):id==='book'?false:save.chests>0;
     if(dot&&!onT){ctx.beginPath();ctx.arc(tx+tw-3,T.y+3,6,0,7);inkIt(C.blood,2);}
     buttons.push({x:tx,y:T.y,w:tw,h:T.h,act:()=>{if(castleTab!==id){castleTab=id;sfx.click();}}});
   });
@@ -6811,6 +7110,7 @@ function drawCastleScreen(pal){
     const gap=6,ch=(R.h-gap*(UPGRADES.length-1))/UPGRADES.length;
     UPGRADES.forEach((u,i)=>drawUpgradeCard(u,R.x,R.y+i*(ch+gap),R.w,ch));
   }else if(castleTab==='skins')drawSkinsTab(R);
+  else if(castleTab==='book')drawBookTab(R);
   else drawChestsTab(R);
   if(castleMsgT>0){
     ctx.globalAlpha=Math.min(1,castleMsgT*2);
@@ -6830,6 +7130,8 @@ function drawLineup(){
 }
 function draw(){
   buttons=[];
+  uiK=uiScaleFor(state);
+  if(save.noShake)shake=0;
   ctx.setTransform(DPR*S,0,0,DPR*S,0,0);
   if(lineupSpec){drawLineup();return;}
   const pal=palette();
@@ -6869,6 +7171,7 @@ function draw(){
   uiW={px:PX,py:P.y};
   ui(()=>{
     if(state==='menu')drawMenu();
+    else if(state==='settings')drawSettings();
     else if(state==='missions')drawMissionsScreen();
     else if(state==='story')drawStoryMap();
     else if(state==='cutscene')drawCutscene();
@@ -6920,7 +7223,7 @@ window.addEventListener('keydown',e=>{
   if(k==='Space'||k==='ArrowUp'||k==='KeyW'||k==='Enter'||k==='NumpadEnter'){
     e.preventDefault();if(e.repeat)return;unlockAudio();pointerIdle=0;
     if(state==='menu')startRun();else if(state==='ready')go();else if(state==='playing')flap();else if(state==='paused')resume();else if(state==='over'&&stateT>0.5)overPrimary();else if(state==='castle'||state==='missions')restart();else if(state==='cutscene')cutNext();else if(state==='finishing')skipFinish();else if(state==='story'&&storySel)startLevel(storySel);
-  }else if(k==='KeyP'||k==='Escape'){if(state==='playing')pause();else if(state==='paused')resume();else if(state==='castle'&&k==='Escape')goMenu();else if(state==='missions')closeMissions();else if(state==='story')goMenu();else if(state==='cutscene')finishCut();}
+  }else if(k==='KeyP'||k==='Escape'){if(state==='playing')pause();else if(state==='paused')resume();else if(state==='castle'&&k==='Escape')goMenu();else if(state==='missions')closeMissions();else if(state==='settings')closeSettings();else if(state==='story')goMenu();else if(state==='cutscene')finishCut();}
   else if((k==='ArrowLeft'||k==='ArrowRight')&&state==='story')switchChapter(k==='ArrowLeft'?-1:1);
   else if(k==='KeyS'||k==='KeyX'||k==='ShiftLeft'||k==='ShiftRight'){if(!e.repeat)doScream();}
   else if(k==='KeyM')toggleMute();
@@ -7035,7 +7338,7 @@ Object.assign(LEVEL_BLURB,{'3-1':'Welcome to the past! Watch out for raptors.','
   '3-4':'The ground goes BLORP. Fly high!','3-5':'Cavemen with slingshots and HUGE dragonflies.','3-6':'The volcano is rumbling and EVERYONE is angry.','3-7':"Mother Hen's great-great-great-granny wants Nugget."});
 
 resize();resetWorld();
-if(!save.tutDone&&!save.runs)startRun();
+if(!save.tutDone&&!save.runs)startLevelNow(CHAPTERS[0].levels[0]);
 requestAnimationFrame(t=>{last=t;requestAnimationFrame(frame);});
 
 /* Test hooks for automated play-testing (harmless in normal play) */
@@ -7071,3 +7374,5 @@ if(location.protocol==='file:')window.__sheepula={
 };
 })();
 </script>
+
+</body></html>
